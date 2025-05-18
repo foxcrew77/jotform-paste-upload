@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Paste & Upload Screenshots</title>
+  <style>
+    body { font-family: Arial, sans-serif; margin: 2em; }
+    #dropzone {
+      border: 2px dashed #888;
+      border-radius: 8px;
+      padding: 2em;
+      text-align: center;
+      color: #888;
+      background: #fafafa;
+      margin-bottom: 1em;
+    }
+    .img-row { margin-bottom: 1em; }
+    .img-preview { max-width: 200px; max-height: 100px; display: block; margin-bottom: 0.5em; }
+    .img-link { font-size: 0.9em; }
+    .img-name { width: 150px; }
+    #uploadAll { margin-top: 1em; }
+  </style>
+</head>
+<body>
+  <h2>Paste or Drag Screenshots</h2>
+  <div id="dropzone" tabindex="0">
+    <p>Click here and press <b>Ctrl+V</b> to paste, or drag images here.<br>
+    Rename if needed, then click "Upload All".</p>
+  </div>
+  <div id="images"></div>
+  <button id="uploadAll" style="display:none;">Upload All</button>
+  <script>
+    const dropzone = document.getElementById('dropzone');
+    const imagesDiv = document.getElementById('images');
+    const uploadAllBtn = document.getElementById('uploadAll');
+    let images = [];
+
+    function addImage(file) {
+      const reader = new FileReader();
+      reader.onload = function(e) {
+        const imgObj = {
+          file: file,
+          dataUrl: e.target.result,
+          name: file.name.replace(/\.[^/.]+$/, "") // default name without extension
+        };
+        images.push(imgObj);
+        renderImages();
+      };
+      reader.readAsDataURL(file);
+    }
+
+    function renderImages() {
+      imagesDiv.innerHTML = '';
+      images.forEach((img, idx) => {
+        const row = document.createElement('div');
+        row.className = 'img-row';
+        row.innerHTML = `
+          <img src="${img.dataUrl}" class="img-preview">
+          <input class="img-name" type="text" value="${img.name}" placeholder="Image name">
+          <button class="delete-btn" title="Delete this image" style="margin-left:8px;">🗑️</button>
+          <span class="img-link" id="link${idx}"></span>
+        `;
+        // Rename handler
+        row.querySelector('.img-name').addEventListener('input', e => {
+          img.name = e.target.value;
+        });
+        // Delete handler
+        row.querySelector('.delete-btn').addEventListener('click', () => {
+          images.splice(idx, 1);
+          renderImages();
+        });
+        imagesDiv.appendChild(row);
+      });
+      uploadAllBtn.style.display = images.length ? 'inline-block' : 'none';
+    }
+
+    dropzone.addEventListener('paste', function(e) {
+      const items = (e.clipboardData || e.originalEvent.clipboardData).items;
+      for (let i = 0; i < items.length; i++) {
+        if (items[i].type.indexOf('image') !== -1) {
+          const file = items[i].getAsFile();
+          addImage(file);
+        }
+      }
+    });
+
+    dropzone.addEventListener('dragover', function(e) {
+      e.preventDefault();
+      dropzone.style.background = '#e0e0e0';
+    });
+    dropzone.addEventListener('dragleave', function(e) {
+      dropzone.style.background = '#fafafa';
+    });
+    dropzone.addEventListener('drop', function(e) {
+      e.preventDefault();
+      dropzone.style.background = '#fafafa';
+      for (const file of e.dataTransfer.files) {
+        if (file && file.type.startsWith('image/')) {
+          addImage(file);
+        }
+      }
+    });
+
+    dropzone.addEventListener('click', function() {
+      dropzone.focus();
+    });
+
+    uploadAllBtn.addEventListener('click', function() {
+      images.forEach((img, idx) => {
+        uploadToImgur(img, idx);
+      });
+    });
+
+    function uploadToImgur(img, idx) {
+      fetch('https://api.imgur.com/3/image', {
+        method: 'POST',
+        headers: {
+          Authorization: 'Client-ID YOUR_IMGUR_CLIENT_ID'
+        },
+        body: toFormData({
+          image: img.dataUrl.split(',')[1],
+          type: 'base64',
+          name: img.name + '.png',
+          title: img.name
+        })
+      })
+      .then(res => res.json())
+      .then(data => {
+        if (data.success) {
+          document.getElementById('link'+idx).innerHTML = `<a href="${data.data.link}" target="_blank">${data.data.link}</a>`;
+        } else {
+          document.getElementById('link'+idx).textContent = 'Upload failed';
+        }
+      })
+      .catch(() => {
+        document.getElementById('link'+idx).textContent = 'Upload error';
+      });
+    }
+
+    function toFormData(obj) {
+      const fd = new FormData();
+      for (let key in obj) fd.append(key, obj[key]);
+      return fd;
+    }
+  </script>
+</body>
+</html>
