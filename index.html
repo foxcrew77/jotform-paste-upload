@@ -3,7 +3,6 @@
 <head>
   <meta charset="UTF-8">
   <title>Paste & Upload Screenshots</title>
-  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-awesome.min.css">
   <style>
     body { font-family: Arial, sans-serif; margin: 2em; }
     #dropzone {
@@ -70,9 +69,9 @@
 <body>
   <div class="custom-section-title">Paste or Drag Screenshots</div>
   <div id="dropzone" tabindex="0">
-    <p>Press  <i style="font-size:24px" class="fa">&#xf17a;</i> + shift + S and take screenshot of the test, then click here and press <b>Ctrl+V</b> to paste, or drag images here.<br>
+    <p>Press  <i style="font-size:24px" class="fa">&#xf17a;</i> + shift + S and take screenshot, click here and press <b>Ctrl+V</b> to paste.<br>
     Rename each image matching the test step. for example, 1_accessible, 1_tracert.
-    <br>Make sure to include the time display or your laptop in the screenshot.
+    <br>Make sure to include the time display of your laptop.
     <br>Images will be uploaded when you submit the form.</p>
   </div>
   <div id="renameWarning" class="rename-warning" style="display:none;">Please rename all images before submitting!</div>
@@ -99,16 +98,44 @@
     // Your Google Drive root folder ID (parent folder for all forms)
     const DRIVE_ROOT_FOLDER_ID = '1VFvqcSDShsIdKbY1yAkEdbxgLH6ppYyl';
 
+    // --- Persistence helpers ---
+    function getStorageKey() {
+      // Use formName as part of the key to avoid cross-form conflicts
+      return 'jotform_images_' + encodeURIComponent(formName);
+    }
+    function saveImagesToStorage() {
+      localStorage.setItem(getStorageKey(), JSON.stringify(images));
+    }
+    function loadImagesFromStorage() {
+      const stored = localStorage.getItem(getStorageKey());
+      if (stored) {
+        try {
+          const arr = JSON.parse(stored);
+          // Only restore if array and has dataUrl (basic check)
+          if (Array.isArray(arr) && arr.every(img => img.dataUrl && img.name)) {
+            images = arr;
+            renderImages();
+          }
+        } catch (e) {
+          images = [];
+        }
+      }
+    }
+    function clearImagesFromStorage() {
+      localStorage.removeItem(getStorageKey());
+    }
+
     function addImage(file) {
       const reader = new FileReader();
       reader.onload = function(e) {
         const imgObj = {
-          file: file,
+          file: null, // Don't store File object in localStorage
           dataUrl: e.target.result,
           name: file.name.replace(/\.[^/.]+$/, "") // name without extension
         };
         images.push(imgObj);
         renderImages();
+        saveImagesToStorage();
       };
       reader.readAsDataURL(file);
     }
@@ -127,11 +154,13 @@
         // Rename handler
         row.querySelector('.img-name').addEventListener('input', e => {
           img.name = e.target.value;
+          saveImagesToStorage();
         });
         // Delete handler
         row.querySelector('.delete-btn').addEventListener('click', () => {
           images.splice(idx, 1);
           renderImages();
+          saveImagesToStorage();
         });
         imagesDiv.appendChild(row);
       });
@@ -194,6 +223,8 @@
             window.parent.postMessage({ action: 'setValue', value: links.join('\n') }, '*');
             // Allow submission/next
             window.parent.postMessage({ action: 'submit' }, '*');
+            // Clear images from storage after successful upload
+            clearImagesFromStorage();
           })
           .catch(() => {
             window.parent.postMessage({ action: 'cancelSubmission', reason: 'Upload failed.' }, '*');
@@ -241,6 +272,9 @@
       // Fallback: use root folder
       return parentId;
     }
+
+    // --- Load images from storage on page load ---
+    loadImagesFromStorage();
   </script>
 </body>
 </html>
