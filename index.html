@@ -8,46 +8,93 @@
     #dropzone {
       border: 2px dashed #888;
       border-radius: 8px;
-      padding: 2em;
+      padding: 1.2em;
       text-align: center;
       color: #888;
       background: #fafafa;
       margin-bottom: 1em;
     }
-    .img-row { margin-bottom: 1em; }
-    /* .img-preview { max-width: 200px; max-height: 100px; display: block; margin-bottom: 0.5em; } */
-    
-    .img-link { font-size: 0.9em; }
-    .img-name { width: 150px; }
-    #uploadAll { margin-top: 1em; }
     .custom-section-title {
-    font-family: 'Inter', Arial, sans-serif;
-    font-size: 1.125rem; /* 18px */
-    color: #2e4a7b;      /* Jotform blue, adjust as needed */
-    font-weight: 700;
-    margin-bottom: 0.5em;
-    margin-top: 0.5em;
-  }
+      font-family: 'Inter', Arial, sans-serif;
+      font-size: 1.125rem;
+      color: #2e4a7b;
+      font-weight: 700;
+      margin-bottom: 0.5em;
+      margin-top: 0.5em;
+    }
+    .img-row {
+      margin-bottom: 0.5em;
+      display: flex;
+      align-items: center;
+      gap: 0.5em;
+    }
+    .img-preview {
+      max-width: 90px;
+      max-height: 45px;
+      display: block;
+      margin-bottom: 0;
+      border: 1px solid #ccc;
+      border-radius: 4px;
+      background: #fff;
+    }
+    .img-link { font-size: 0.9em; word-break: break-all; }
+    .img-name {
+      width: 110px;
+      padding: 3px 6px;
+      border-radius: 4px;
+      border: 1px solid #ccc;
+      font-size: 1em;
+    }
+    .delete-btn {
+      background: #f8d7da;
+      color: #721c24;
+      border: none;
+      border-radius: 4px;
+      padding: 4px 8px;
+      cursor: pointer;
+      font-size: 1em;
+      transition: background 0.2s;
+    }
+    .delete-btn:hover {
+      background: #f5c6cb;
+    }
+    .rename-warning {
+      color: #d9534f;
+      font-size: 0.95em;
+      margin-bottom: 0.5em;
+      font-weight: 600;
+    }
   </style>
 </head>
 <body>
-  <h2 class="custom-section-title">Paste or Drag Screenshots</h2>
+  <div class="custom-section-title">Paste or Drag Screenshots</div>
   <div id="dropzone" tabindex="0">
     <p>Click here and press <b>Ctrl+V</b> to paste, or drag images here.<br>
-    Rename if needed, then click "Upload All".</p>
+    Rename if needed. Images will be uploaded when you submit the form.</p>
   </div>
+  <div id="renameWarning" class="rename-warning" style="display:none;">Please rename all images before submitting!</div>
   <div id="images"></div>
-  <button id="uploadAll" style="display:none;">Upload All</button>
   <script>
+    // --- Helper to get URL params ---
+    function getQueryParam(name) {
+      const url = new URL(window.location.href);
+      return url.searchParams.get(name) || '';
+    }
+    // Get Jotform data from URL
+    let formName = getQueryParam('formName') || 'DefaultForm';
+    let submissionId = getQueryParam('submissionId') || 'NoID';
+    let userName = getQueryParam('userName') || 'NoName';
+    let organization = getQueryParam('organization') || 'NoOrg';
+
     const dropzone = document.getElementById('dropzone');
     const imagesDiv = document.getElementById('images');
-    const uploadAllBtn = document.getElementById('uploadAll');
+    const renameWarning = document.getElementById('renameWarning');
     let images = [];
 
-    // Replace with your actual Cloud Function URL
+    // Your Cloud Function URL (should not change)
     const CLOUD_FUNCTION_URL = 'https://asia-southeast1-jotform-paste-upload.cloudfunctions.net/uploadImage';
-    // Replace with your actual Google Drive folder ID
-    const DRIVE_FOLDER_ID = '1VFvqcSDShsIdKbY1yAkEdbxgLH6ppYyl';
+    // Your Google Drive root folder ID (parent folder for all forms)
+    const DRIVE_ROOT_FOLDER_ID = '1VFvqcSDShsIdKbY1yAkEdbxgLH6ppYyl';
 
     function addImage(file) {
       const reader = new FileReader();
@@ -71,7 +118,7 @@
         row.innerHTML = `
           <img src="${img.dataUrl}" class="img-preview">
           <input class="img-name" type="text" value="${img.name}" placeholder="Image name">
-          <button class="delete-btn" title="Delete this image" style="margin-left:8px;">🗑️</button>
+          <button class="delete-btn" title="Delete this image">🗑️</button>
           <span class="img-link" id="link${idx}"></span>
         `;
         // Rename handler
@@ -85,7 +132,6 @@
         });
         imagesDiv.appendChild(row);
       });
-      uploadAllBtn.style.display = images.length ? 'inline-block' : 'none';
     }
 
     dropzone.addEventListener('paste', function(e) {
@@ -119,35 +165,78 @@
       dropzone.focus();
     });
 
-    uploadAllBtn.addEventListener('click', function() {
-      images.forEach((img, idx) => {
-        uploadToDrive(img, idx);
-      });
+    function validateImageNames() {
+      for (let img of images) {
+        if (img.name.trim().toLowerCase() === 'image' || img.name.trim() === '') {
+          return false;
+        }
+      }
+      return true;
+    }
+
+    // Widget API: Listen for Jotform next/submit
+    window.addEventListener('message', function(e) {
+      if (e.data && (e.data.type === 'next' || e.data.type === 'submit')) {
+        if (!validateImageNames()) {
+          renameWarning.style.display = 'block';
+          // Block next page or submission
+          window.parent.postMessage({ action: 'cancelSubmission', reason: 'Please rename all images.' }, '*');
+          return;
+        }
+        renameWarning.style.display = 'none';
+        // Upload all images, collect links
+        Promise.all(images.map((img, idx) => uploadToDrive(img, idx)))
+          .then(links => {
+            // Pass links to Jotform (as a single string, e.g., newline separated)
+            window.parent.postMessage({ action: 'setValue', value: links.join('\n') }, '*');
+            // Allow submission/next
+            window.parent.postMessage({ action: 'submit' }, '*');
+          })
+          .catch(() => {
+            window.parent.postMessage({ action: 'cancelSubmission', reason: 'Upload failed.' }, '*');
+          });
+      }
     });
 
-    function uploadToDrive(img, idx) {
-      fetch(CLOUD_FUNCTION_URL, {
+    // Upload to Drive, creating a subfolder for the form if needed
+    async function uploadToDrive(img, idx) {
+      // 1. Create/get subfolder for this form
+      const subfolderId = await getOrCreateSubfolder(formName, DRIVE_ROOT_FOLDER_ID);
+      // 2. Upload image with prefixed name
+      const fileName = `${formName} ${organization} ${userName} ${submissionId}_${img.name}.png`;
+      return fetch(CLOUD_FUNCTION_URL, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           imageBase64: img.dataUrl.split(',')[1],
-          fileName: img.name + '.png',
-          folderId: DRIVE_FOLDER_ID
+          fileName: fileName,
+          folderId: subfolderId
         })
       })
       .then(res => res.json())
-      .then(data => {
-        if (data.webViewLink) {
-          document.getElementById('link'+idx).innerHTML = `<a href="${data.webViewLink}" target="_blank">${data.webViewLink}</a>`;
-        } else {
-          document.getElementById('link'+idx).textContent = 'Upload failed';
-        }
-      })
-      .catch(() => {
-        document.getElementById('link'+idx).textContent = 'Upload error';
+      .then(data => data.webViewLink || 'Upload failed');
+    }
+
+    // Helper: Create or get subfolder for form
+    async function getOrCreateSubfolder(formName, parentId) {
+      // Try to get from localStorage cache first
+      const cacheKey = 'subfolder_' + formName;
+      let cached = localStorage.getItem(cacheKey);
+      if (cached) return cached;
+
+      // Call your backend to create/get the subfolder
+      const res = await fetch(CLOUD_FUNCTION_URL + '/createSubfolder', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ formName, parentId })
       });
+      const data = await res.json();
+      if (data.folderId) {
+        localStorage.setItem(cacheKey, data.folderId);
+        return data.folderId;
+      }
+      // Fallback: use root folder
+      return parentId;
     }
   </script>
 </body>
