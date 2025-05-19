@@ -3,6 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <title>Paste & Upload Screenshots</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-awesome.min.css">
   <style>
     body { font-family: Arial, sans-serif; margin: 2em; }
     #dropzone {
@@ -69,10 +70,14 @@
 <body>
   <div class="custom-section-title">Paste or Drag Screenshots</div>
   <div id="dropzone" tabindex="0">
-    <p>Press  <i style="font-size:24px" class="fa">&#xf17a;</i> + shift + S and take screenshot, click here and press <b>Ctrl+V</b> to paste.<br>
-    Rename each image matching the test step. for example, 1_accessible, 1_tracert.
-    <br>Make sure to include the time display of your laptop.
-    <br>Images will be uploaded when you submit the form.</p>
+    <div id="instructions">
+      <p>
+        Press   <button style="font-size:24px">Button <i class="fa fa-windows"></i></button> + shift + S and take screenshot, click here and press <b>Ctrl+V</b> to paste.<br>
+        Rename each image matching the test step. for example, 1_accessible, 1_tracert.<br>
+        Make sure to include the time display of your laptop.<br>
+        Images will be uploaded when you submit the form.
+      </p>
+    </div>
   </div>
   <div id="renameWarning" class="rename-warning" style="display:none;">Please rename all images before submitting!</div>
   <div id="images"></div>
@@ -141,30 +146,47 @@
     }
 
     function renderImages() {
-      imagesDiv.innerHTML = '';
-      images.forEach((img, idx) => {
-        const row = document.createElement('div');
-        row.className = 'img-row';
-        row.innerHTML = `
-          <img src="${img.dataUrl}" class="img-preview">
-          <input class="img-name" type="text" value="${img.name}" placeholder="Image name">
-          <button class="delete-btn" title="Delete this image">🗑️</button>
-          <span class="img-link" id="link${idx}"></span>
-        `;
-        // Rename handler
-        row.querySelector('.img-name').addEventListener('input', e => {
-          img.name = e.target.value;
-          saveImagesToStorage();
-        });
-        // Delete handler
-        row.querySelector('.delete-btn').addEventListener('click', () => {
-          images.splice(idx, 1);
-          renderImages();
-          saveImagesToStorage();
-        });
-        imagesDiv.appendChild(row);
-      });
-    }
+  // Update instructions message
+  const instructionsDiv = document.getElementById('instructions');
+  if (images.length === 0) {
+    instructionsDiv.innerHTML = `
+      <p>
+        Press  &nbsp;<strong><i class="fa fa-windows" style="font-size:24px"></i> + shift + S</strong> and take screenshot, click here and press <b>Ctrl+V</b> to paste.<br>
+        Rename each image matching the test step. for example, 1_accessible, 1_tracert.<br>
+        Make sure to include the time display of your laptop.<br>
+        Images will be uploaded when you submit the form.
+      </p>
+    `;
+  } else {
+    instructionsDiv.innerHTML = `
+      <p><b>Make sure to rename each image matching the test step.</b></p>
+    `;
+  }
+
+  imagesDiv.innerHTML = '';
+  images.forEach((img, idx) => {
+    const row = document.createElement('div');
+    row.className = 'img-row';
+    row.innerHTML = `
+      <img src="${img.dataUrl}" class="img-preview">
+      <input class="img-name" type="text" value="${img.name}" placeholder="Image name">
+      <button class="delete-btn" title="Delete this image">🗑️</button>
+      <span class="img-link" id="link${idx}"></span>
+    `;
+    // Rename handler
+    row.querySelector('.img-name').addEventListener('input', e => {
+      img.name = e.target.value;
+      saveImagesToStorage();
+    });
+    // Delete handler
+    row.querySelector('.delete-btn').addEventListener('click', () => {
+      images.splice(idx, 1);
+      renderImages();
+      saveImagesToStorage();
+    });
+    imagesDiv.appendChild(row);
+  });
+}
 
     dropzone.addEventListener('paste', function(e) {
       const items = (e.clipboardData || e.originalEvent.clipboardData).items;
