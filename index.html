@@ -46,7 +46,7 @@
       border: 1px solid #ccc;
       font-size: 1em;
     }
-    .delete-btn, .upload-btn {
+    .delete-btn {
       background: #f8d7da;
       color: #721c24;
       border: none;
@@ -57,15 +57,8 @@
       transition: background 0.2s;
       margin-left: 2px;
     }
-    .upload-btn {
-      background: #d4edda;
-      color: #155724;
-    }
     .delete-btn:hover {
       background: #f5c6cb;
-    }
-    .upload-btn:hover {
-      background: #c3e6cb;
     }
     .rename-warning {
       color: #d9534f;
@@ -77,8 +70,18 @@
       font-size: 1.2em;
       margin-left: 4px;
     }
+    #stickyUploadBar {
+      position: sticky;
+      bottom: 0;
+      left: 0;
+      width: 100%;
+      background: #fff;
+      padding: 10px 0 0 0;
+      z-index: 100;
+      display: flex;
+      justify-content: flex-start;
+    }
     #batchUploadBtn {
-      margin-top: 1em;
       background: #007bff;
       color: #fff;
       border: none;
@@ -120,8 +123,9 @@
   </div>
   <div id="renameWarning" class="rename-warning" style="display:none;">Please rename all images before submitting!</div>
   <div id="images"></div>
-  <!-- 6. Batch upload button below -->
-  <button id="batchUploadBtn" style="display:none;">Upload All Images</button>
+  <div id="stickyUploadBar">
+    <button id="batchUploadBtn" style="display:none;">Upload All Images</button>
+  </div>
   <div id="blocker">Please upload all images before submitting the form.</div>
   <script>
     // --- Hardcoded folder name for all uploads ---
@@ -142,7 +146,7 @@
         String(d.getSeconds()).padStart(2, '0')
       );
     }
-    const submissionPrefix = 'submission_' + getHumanTimestamp(); // 7
+    const submissionPrefix = 'submission_' + getHumanTimestamp();
 
     // --- Helper to get URL params (not used for naming anymore, but kept for future use) ---
     function getQueryParam(name) {
@@ -187,16 +191,14 @@
       localStorage.removeItem(getStorageKey());
     }
 
-    // 3. Track upload status for each image
     function addImage(file) {
       const reader = new FileReader();
       reader.onload = function(e) {
-        // 5. Pre-fill image names
         const imgObj = {
           file: null,
           dataUrl: e.target.result,
           name: `${PAGE_ID}_image${images.length + 1}`,
-          status: 'pending', // 3. status: pending, uploading, success, error
+          status: 'pending',
           link: ''
         };
         images.push(imgObj);
@@ -206,7 +208,6 @@
       reader.readAsDataURL(file);
     }
 
-    // 1. Add tick button, 2. Show upload status, 3. Track status, 6. Batch upload button
     function renderImages() {
       const instructionsDiv = document.getElementById('instructions');
       if (images.length === 0) {
@@ -231,7 +232,6 @@
         row.innerHTML = `
           <img src="${img.dataUrl}" class="img-preview">
           <input class="img-name" type="text" value="${img.name}" placeholder="Image name">
-          <button class="upload-btn" title="Upload this image" ${img.status === 'success' ? 'disabled' : ''}>✔️</button>
           <button class="delete-btn" title="Delete this image">🗑️</button>
           <span class="img-status" id="status${idx}">
             ${img.status === 'uploading' ? '⏳' : img.status === 'success' ? '✔️' : img.status === 'error' ? '❌' : ''}
@@ -247,26 +247,9 @@
           renderImages();
           saveImagesToStorage();
         });
-        // 1. Tick button upload logic
-        row.querySelector('.upload-btn').addEventListener('click', async () => {
-          if (img.status === 'success') return;
-          img.status = 'uploading';
-          renderImages();
-          saveImagesToStorage();
-          try {
-            const link = await uploadToDrive(img, idx);
-            img.status = 'success';
-            img.link = link;
-          } catch {
-            img.status = 'error';
-          }
-          renderImages();
-          saveImagesToStorage();
-        });
         imagesDiv.appendChild(row);
       });
 
-      // 6. Show batch upload button if there are images not uploaded
       const anyPending = images.some(img => img.status !== 'success');
       batchUploadBtn.style.display = images.length > 0 && anyPending ? '' : 'none';
       batchUploadBtn.disabled = !anyPending;
@@ -312,12 +295,10 @@
       return true;
     }
 
-    // 4. Block submit if not all images uploaded
     function allImagesUploaded() {
       return images.every(img => img.status === 'success');
     }
 
-    // 6. Batch upload button logic
     batchUploadBtn.addEventListener('click', async function() {
       for (let idx = 0; idx < images.length; idx++) {
         let img = images[idx];
@@ -338,7 +319,6 @@
       }
     });
 
-    // 4. Block submit if not all images uploaded
     window.addEventListener('message', function(e) {
       if (e.data && (e.data.type === 'next' || e.data.type === 'submit')) {
         if (!allImagesUploaded()) {
@@ -352,11 +332,9 @@
       }
     });
 
-    // 7. Human-readable timestamp in filename
     async function uploadToDrive(img, idx) {
       const formFolderId = await getOrCreateSubfolder(FORM_FOLDER_NAME, DRIVE_ROOT_FOLDER_ID);
       const fileName = `${submissionPrefix}_${img.name}.png`;
-      // Debug: log before fetch
       console.log('Uploading image:', fileName, 'to folder:', formFolderId);
       return fetch(CLOUD_FUNCTION_URL, {
         method: 'POST',
@@ -369,13 +347,11 @@
       })
       .then(res => res.json())
       .then(data => {
-        // Debug: log after fetch
         console.log('Upload response:', data);
         return data.webViewLink || 'Upload failed';
       });
     }
 
-    // Helper: Create or get subfolder for form
     async function getOrCreateSubfolder(folderName, parentId) {
       const cacheKey = 'subfolder_' + parentId + '_' + folderName;
       let cached = localStorage.getItem(cacheKey);
@@ -393,8 +369,7 @@
       }
       return parentId;
     }
-
-    // --- Load images from storage on page load ---
+    clearImagesFromStorage(); 
     loadImagesFromStorage();
   </script>
 </body>
