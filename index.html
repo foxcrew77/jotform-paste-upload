@@ -84,30 +84,38 @@
   <script>
     // --- Hardcoded folder name for all uploads ---
     const FORM_FOLDER_NAME = "Sabah Gov DR Drill 2025 Checklist (Before swing)";
-  
+
     // --- Helper to get a unique prefix for this submission ---
     // This uses the current timestamp for uniqueness
     const submissionPrefix = 'submission_' + Date.now();
-  
+
     // --- Helper to get URL params (not used for naming anymore, but kept for future use) ---
     function getQueryParam(name) {
       const url = new URL(window.location.href);
       return url.searchParams.get(name) || '';
     }
-  
+
     // Get Jotform data from URL (not used for naming anymore)
     let driveField = getQueryParam('driveField') || '';
-  
+
+    // Log all query params for debugging
+    console.log('formName:', getQueryParam('formName') || 'DefaultForm');
+    console.log('submissionId:', getQueryParam('submissionId') || 'NoID');
+    console.log('userName:', getQueryParam('userName') || 'NoName');
+    console.log('organization:', getQueryParam('organization') || 'NoOrg');
+    console.log('driveField:', driveField);
+    alert('formName: ' + (getQueryParam('formName') || 'DefaultForm') + '\nsubmissionId: ' + (getQueryParam('submissionId') || 'NoID') + '\nuserName: ' + (getQueryParam('userName') || 'NoName') + '\norganization: ' + (getQueryParam('organization') || 'NoOrg') + '\ndriveField: ' + driveField);
+
     const dropzone = document.getElementById('dropzone');
     const imagesDiv = document.getElementById('images');
     const renameWarning = document.getElementById('renameWarning');
     let images = [];
-  
+
     // Your Cloud Function URL (should not change)
     const CLOUD_FUNCTION_URL = 'https://asia-southeast1-jotform-paste-upload.cloudfunctions.net/uploadImage';
     // Your Google Drive root folder ID (parent folder for all forms)
     const DRIVE_ROOT_FOLDER_ID = '1VFvqcSDShsIdKbY1yAkEdbxgLH6ppYyl';
-  
+
     // --- Persistence helpers ---
     function getStorageKey() {
       return 'jotform_images_' + FORM_FOLDER_NAME;
@@ -132,7 +140,7 @@
     function clearImagesFromStorage() {
       localStorage.removeItem(getStorageKey());
     }
-  
+
     function addImage(file) {
       const reader = new FileReader();
       reader.onload = function(e) {
@@ -147,7 +155,7 @@
       };
       reader.readAsDataURL(file);
     }
-  
+
     function renderImages() {
       const instructionsDiv = document.getElementById('instructions');
       if (images.length === 0) {
@@ -164,7 +172,7 @@
           <p><b>Make sure to rename each image matching the test step.</b></p>
         `;
       }
-  
+
       imagesDiv.innerHTML = '';
       images.forEach((img, idx) => {
         const row = document.createElement('div');
@@ -187,7 +195,7 @@
         imagesDiv.appendChild(row);
       });
     }
-  
+
     dropzone.addEventListener('paste', function(e) {
       const items = (e.clipboardData || e.originalEvent.clipboardData).items;
       for (let i = 0; i < items.length; i++) {
@@ -197,7 +205,7 @@
         }
       }
     });
-  
+
     dropzone.addEventListener('dragover', function(e) {
       e.preventDefault();
       dropzone.style.background = '#e0e0e0';
@@ -214,11 +222,11 @@
         }
       }
     });
-  
+
     dropzone.addEventListener('click', function() {
       dropzone.focus();
     });
-  
+
     function validateImageNames() {
       for (let img of images) {
         if (img.name.trim().toLowerCase() === 'image' || img.name.trim() === '') {
@@ -227,7 +235,7 @@
       }
       return true;
     }
-  
+
     // Widget API: Listen for Jotform next/submit
     window.addEventListener('message', function(e) {
       if (e.data && (e.data.type === 'next' || e.data.type === 'submit')) {
@@ -241,6 +249,7 @@
           .then(links => {
             // Debug: log the value that will be sent to the hidden field
             console.log("Setting driveField value:", links.join('\n'));
+            alert('Setting driveField value: ' + links.join('\n'));
             if (driveField) {
               window.parent.postMessage({ action: 'setValue', field: driveField, value: links.join('\n') }, '*');
             } else {
@@ -254,7 +263,7 @@
           });
       }
     });
-  
+
     // Upload to Drive, using hardcoded folder and unique filename prefix
     async function uploadToDrive(img, idx) {
       // 1. Create/get subfolder for this form (hardcoded)
@@ -273,13 +282,13 @@
       .then(res => res.json())
       .then(data => data.webViewLink || 'Upload failed');
     }
-  
+
     // Helper: Create or get subfolder for form
     async function getOrCreateSubfolder(folderName, parentId) {
       const cacheKey = 'subfolder_' + parentId + '_' + folderName;
       let cached = localStorage.getItem(cacheKey);
       if (cached) return cached;
-  
+
       const res = await fetch(CLOUD_FUNCTION_URL + '/createSubfolder', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -292,7 +301,7 @@
       }
       return parentId;
     }
-  
+
     // --- Load images from storage on page load ---
     loadImagesFromStorage();
   </script>
