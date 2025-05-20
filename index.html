@@ -86,7 +86,6 @@
     const FORM_FOLDER_NAME = "Sabah Gov DR Drill 2025 Checklist (Before swing)";
 
     // --- Helper to get a unique prefix for this submission ---
-    // This uses the current timestamp for uniqueness
     const submissionPrefix = 'submission_' + Date.now();
 
     // --- Helper to get URL params (not used for naming anymore, but kept for future use) ---
@@ -95,16 +94,11 @@
       return url.searchParams.get(name) || '';
     }
 
-    // Get Jotform data from URL (not used for naming anymore)
-    let driveField = getQueryParam('driveField') || '';
-
-    // Log all query params for debugging
+    // Debug log (optional, can remove if not needed)
     console.log('formName:', getQueryParam('formName') || 'DefaultForm');
     console.log('submissionId:', getQueryParam('submissionId') || 'NoID');
     console.log('userName:', getQueryParam('userName') || 'NoName');
     console.log('organization:', getQueryParam('organization') || 'NoOrg');
-    console.log('driveField:', driveField);
-    alert('formName: ' + (getQueryParam('formName') || 'DefaultForm') + '\nsubmissionId: ' + (getQueryParam('submissionId') || 'NoID') + '\nuserName: ' + (getQueryParam('userName') || 'NoName') + '\norganization: ' + (getQueryParam('organization') || 'NoOrg') + '\ndriveField: ' + driveField);
 
     const dropzone = document.getElementById('dropzone');
     const imagesDiv = document.getElementById('images');
@@ -247,14 +241,9 @@
         renameWarning.style.display = 'none';
         Promise.all(images.map((img, idx) => uploadToDrive(img, idx)))
           .then(links => {
-            // Debug: log the value that will be sent to the hidden field
-            console.log("Setting driveField value:", links.join('\n'));
-            alert('Setting driveField value: ' + links.join('\n'));
-            if (driveField) {
-              window.parent.postMessage({ action: 'setValue', field: driveField, value: links.join('\n') }, '*');
-            } else {
-              window.parent.postMessage({ action: 'setValue', value: links.join('\n') }, '*');
-            }
+            // Show links in the widget
+            imagesDiv.innerHTML += '<div><b>Uploaded to Google Drive:</b><br>' + links.map(link => `<a href="${link}" target="_blank">${link}</a>`).join('<br>') + '</div>';
+            // Optionally, trigger Jotform submit
             window.parent.postMessage({ action: 'submit' }, '*');
             clearImagesFromStorage();
           })
