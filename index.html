@@ -128,249 +128,266 @@
   </div>
   <div id="blocker">Please upload all images before submitting the form.</div>
   <script>
-    // --- Hardcoded folder name for all uploads ---
-    const FORM_FOLDER_NAME = "(Before DR Swing) Sabah Gov DR Drill 2025 Checklist";
+   // --- Hardcoded folder name for all uploads ---
+const FORM_FOLDER_NAME = "(Before DR Swing) Sabah Gov DR Drill 2025 Checklist";
 
-    // --- Identify page via URL param (for per-page storage) ---
-    const PAGE_ID = getQueryParam('pageId') || 'defaultPage';
+// --- Identify page via URL param (for per-page storage) ---
+const PAGE_ID = getQueryParam('pageId') || 'defaultPage';
 
-    // --- Helper to get a human-readable timestamp for filenames (7) ---
-    function getHumanTimestamp() {
-      const d = new Date();
-      return (
-        d.getFullYear() + "-" +
-        String(d.getMonth() + 1).padStart(2, '0') + "-" +
-        String(d.getDate()).padStart(2, '0') + "_" +
-        String(d.getHours()).padStart(2, '0') +
-        String(d.getMinutes()).padStart(2, '0') +
-        String(d.getSeconds()).padStart(2, '0')
-      );
-    }
-    const submissionPrefix = 'submission_' + getHumanTimestamp();
+// --- Helper to get a unique prefix for this submission ---
+const submissionPrefix = 'submission_' + Date.now();
 
-    // --- Helper to get URL params (not used for naming anymore, but kept for future use) ---
-    function getQueryParam(name) {
-      const url = new URL(window.location.href);
-      return url.searchParams.get(name) || '';
-    }
+// --- Helper to get URL params (not used for naming anymore, but kept for future use) ---
+function getQueryParam(name) {
+  const url = new URL(window.location.href);
+  return url.searchParams.get(name) || '';
+}
 
-    const dropzone = document.getElementById('dropzone');
-    const imagesDiv = document.getElementById('images');
-    const renameWarning = document.getElementById('renameWarning');
-    const batchUploadBtn = document.getElementById('batchUploadBtn');
-    const blocker = document.getElementById('blocker');
-    let images = [];
+// Get Jotform data from URL (not used for naming anymore)
+let driveField = getQueryParam('driveField') || '';
 
-    // Your Cloud Function URL (should not change)
-    const CLOUD_FUNCTION_URL = 'https://asia-southeast1-jotform-paste-upload.cloudfunctions.net/uploadImage';
-    // Your Google Drive root folder ID (parent folder for all forms)
-    const DRIVE_ROOT_FOLDER_ID = '1VFvqcSDShsIdKbY1yAkEdbxgLH6ppYyl';
+// Log all query params for debugging
+console.log('formName:', getQueryParam('formName') || 'DefaultForm');
+console.log('submissionId:', getQueryParam('submissionId') || 'NoID');
+console.log('userName:', getQueryParam('userName') || 'NoName');
+console.log('organization:', getQueryParam('organization') || 'NoOrg');
+console.log('driveField:', driveField);
+alert('formName: ' + (getQueryParam('formName') || 'DefaultForm') + '\nsubmissionId: ' + (getQueryParam('submissionId') || 'NoID') + '\nuserName: ' + (getQueryParam('userName') || 'NoName') + '\norganization: ' + (getQueryParam('organization') || 'NoOrg') + '\ndriveField: ' + driveField);
 
-    // --- Persistence helpers ---
-    function getStorageKey() {
-      return 'jotform_images_' + FORM_FOLDER_NAME + '_' + PAGE_ID;
-    }
-    function saveImagesToStorage() {
-      localStorage.setItem(getStorageKey(), JSON.stringify(images));
-    }
-    function loadImagesFromStorage() {
-      const stored = localStorage.getItem(getStorageKey());
-      if (stored) {
-        try {
-          const arr = JSON.parse(stored);
-          if (Array.isArray(arr) && arr.every(img => img.dataUrl && img.name)) {
-            images = arr;
-            renderImages();
-          }
-        } catch (e) {
-          images = [];
-        }
+const dropzone = document.getElementById('dropzone');
+const imagesDiv = document.getElementById('images');
+const renameWarning = document.getElementById('renameWarning');
+let images = [];
+
+// Your Cloud Function URL (should not change)
+const CLOUD_FUNCTION_URL = 'https://asia-southeast1-jotform-paste-upload.cloudfunctions.net/uploadImage';
+// Your Google Drive root folder ID (parent folder for all forms)
+const DRIVE_ROOT_FOLDER_ID = '1VFvqcSDShsIdKbY1yAkEdbxgLH6ppYyl';
+
+// --- Persistence helpers ---
+function getStorageKey() {
+  return 'jotform_images_' + FORM_FOLDER_NAME + '_' + PAGE_ID;
+}
+function saveImagesToStorage() {
+  sessionStorage.setItem(getStorageKey(), JSON.stringify(images));
+}
+function loadImagesFromStorage() {
+  const stored = sessionStorage.getItem(getStorageKey());
+  if (stored) {
+    try {
+      const arr = JSON.parse(stored);
+      if (Array.isArray(arr) && arr.every(img => img.dataUrl && img.name)) {
+        images = arr;
+        renderImages();
       }
+    } catch (e) {
+      images = [];
     }
-    function clearImagesFromStorage() {
-      localStorage.removeItem(getStorageKey());
-    }
+  }
+}
+function clearImagesFromStorage() {
+  sessionStorage.removeItem(getStorageKey());
+}
 
-    function addImage(file) {
-      const reader = new FileReader();
-      reader.onload = function(e) {
-        const imgObj = {
-          file: null,
-          dataUrl: e.target.result,
-          name: `${PAGE_ID}_image${images.length + 1}`,
-          status: 'pending',
-          link: ''
-        };
-        images.push(imgObj);
+function addImage(file) {
+  const reader = new FileReader();
+  reader.onload = function(e) {
+    const imgObj = {
+      file: null,
+      dataUrl: e.target.result,
+      name: file.name.replace(/\.[^/.]+$/, "") // name without extension
+    };
+    images.push(imgObj);
+    renderImages();
+    saveImagesToStorage();
+  };
+  reader.readAsDataURL(file);
+}
+
+function renderImages() {
+  const instructionsDiv = document.getElementById('instructions');
+  if (images.length === 0) {
+    instructionsDiv.innerHTML = `
+      <p>
+        Press <i style="font-size:24px" class="fa fa-windows"></i> + shift + S and take screenshot, click here and press <b>Ctrl+V</b> to paste.<br>
+        Rename each image matching the test step. for example, 1_accessible, 1_tracert.<br>
+        Make sure to include the time display of your laptop.<br>
+        Images will be uploaded when you submit the form.
+      </p>
+    `;
+  } else {
+    instructionsDiv.innerHTML = `
+      <p><b>Make sure to rename each image matching the test step.</b></p>
+    `;
+  }
+
+  imagesDiv.innerHTML = '';
+  images.forEach((img, idx) => {
+    const row = document.createElement('div');
+    row.className = 'img-row';
+    row.innerHTML = `
+      <img src="${img.dataUrl}" class="img-preview">
+      <input class="img-name" type="text" value="${img.name}" placeholder="Image name">
+      ${img.status !== 'success' ? '<button class="delete-btn" title="Delete this image">🗑️</button>' : ''}
+      <span class="img-status" id="status${idx}">
+        ${img.status === 'uploading' ? '⏳' : img.status === 'success' ? '✔️' : img.status === 'error' ? '❌' : ''}
+      </span>
+      <span class="img-link" id="link${idx}">${img.link ? `<a href="${img.link}" target="_blank">View</a>` : ''}</span>
+    `;
+    row.querySelector('.img-name').addEventListener('input', e => {
+      img.name = e.target.value;
+      saveImagesToStorage();
+    });
+    if (img.status !== 'success') {
+      row.querySelector('.delete-btn').addEventListener('click', () => {
+        images.splice(idx, 1);
         renderImages();
         saveImagesToStorage();
-      };
-      reader.readAsDataURL(file);
-    }
-
-    function renderImages() {
-      const instructionsDiv = document.getElementById('instructions');
-      if (images.length === 0) {
-        instructionsDiv.innerHTML = `
-          <p>
-            Press <i style="font-size:24px" class="fa fa-windows"></i> + shift + S and take screenshot, click here and press <b>Ctrl+V</b> to paste.<br>
-            Rename each image matching the test step. for example, 1_accessible, 1_tracert.<br>
-            Make sure to include the time display of your laptop.<br>
-            Images will be uploaded when you submit the form.
-          </p>
-        `;
-      } else {
-        instructionsDiv.innerHTML = `
-          <p><b>Make sure to rename each image matching the test step.</b></p>
-        `;
-      }
-
-      imagesDiv.innerHTML = '';
-      images.forEach((img, idx) => {
-        const row = document.createElement('div');
-        row.className = 'img-row';
-        row.innerHTML = `
-          <img src="${img.dataUrl}" class="img-preview">
-          <input class="img-name" type="text" value="${img.name}" placeholder="Image name">
-          <button class="delete-btn" title="Delete this image">🗑️</button>
-          <span class="img-status" id="status${idx}">
-            ${img.status === 'uploading' ? '⏳' : img.status === 'success' ? '✔️' : img.status === 'error' ? '❌' : ''}
-          </span>
-          <span class="img-link" id="link${idx}">${img.link ? `<a href="${img.link}" target="_blank">View</a>` : ''}</span>
-        `;
-        row.querySelector('.img-name').addEventListener('input', e => {
-          img.name = e.target.value;
-          saveImagesToStorage();
-        });
-        row.querySelector('.delete-btn').addEventListener('click', () => {
-          images.splice(idx, 1);
-          renderImages();
-          saveImagesToStorage();
-        });
-        imagesDiv.appendChild(row);
       });
-
-      const anyPending = images.some(img => img.status !== 'success');
-      batchUploadBtn.style.display = images.length > 0 && anyPending ? '' : 'none';
-      batchUploadBtn.disabled = !anyPending;
     }
+    imagesDiv.appendChild(row);
+  });
+}
 
-    dropzone.addEventListener('paste', function(e) {
-      const items = (e.clipboardData || e.originalEvent.clipboardData).items;
-      for (let i = 0; i < items.length; i++) {
-        if (items[i].type.indexOf('image') !== -1) {
-          const file = items[i].getAsFile();
-          addImage(file);
-        }
-      }
-    });
-
-    dropzone.addEventListener('dragover', function(e) {
-      e.preventDefault();
-      dropzone.style.background = '#e0e0e0';
-    });
-    dropzone.addEventListener('dragleave', function(e) {
-      dropzone.style.background = '#fafafa';
-    });
-    dropzone.addEventListener('drop', function(e) {
-      e.preventDefault();
-      dropzone.style.background = '#fafafa';
-      for (const file of e.dataTransfer.files) {
-        if (file && file.type.startsWith('image/')) {
-          addImage(file);
-        }
-      }
-    });
-
-    dropzone.addEventListener('click', function() {
-      dropzone.focus();
-    });
-
-    function validateImageNames() {
-      for (let img of images) {
-        if (img.name.trim().toLowerCase() === 'image' || img.name.trim() === '') {
-          return false;
-        }
-      }
-      return true;
+dropzone.addEventListener('paste', function(e) {
+  const items = (e.clipboardData || e.originalEvent.clipboardData).items;
+  for (let i = 0; i < items.length; i++) {
+    if (items[i].type.indexOf('image') !== -1) {
+      const file = items[i].getAsFile();
+      addImage(file);
     }
+  }
+});
 
-    function allImagesUploaded() {
-      return images.every(img => img.status === 'success');
+dropzone.addEventListener('dragover', function(e) {
+  e.preventDefault();
+  dropzone.style.background = '#e0e0e0';
+});
+dropzone.addEventListener('dragleave', function(e) {
+  dropzone.style.background = '#fafafa';
+});
+dropzone.addEventListener('drop', function(e) {
+  e.preventDefault();
+  dropzone.style.background = '#fafafa';
+  for (const file of e.dataTransfer.files) {
+    if (file && file.type.startsWith('image/')) {
+      addImage(file);
     }
+  }
+});
 
-    batchUploadBtn.addEventListener('click', async function() {
-      for (let idx = 0; idx < images.length; idx++) {
-        let img = images[idx];
-        if (img.status !== 'success') {
-          img.status = 'uploading';
-          renderImages();
-          saveImagesToStorage();
-          try {
-            const link = await uploadToDrive(img, idx);
-            img.status = 'success';
-            img.link = link;
-          } catch {
-            img.status = 'error';
-          }
-          renderImages();
-          saveImagesToStorage();
-        }
-      }
-    });
+dropzone.addEventListener('click', function() {
+  dropzone.focus();
+});
 
-    window.addEventListener('message', function(e) {
-      if (e.data && (e.data.type === 'next' || e.data.type === 'submit')) {
-        if (!allImagesUploaded()) {
-          blocker.style.display = 'flex';
-          setTimeout(() => { blocker.style.display = 'none'; }, 3000);
-          window.parent.postMessage({ action: 'cancelSubmission', reason: 'Please upload all images.' }, '*');
-          return;
-        }
+function validateImageNames() {
+  for (let img of images) {
+    if (img.name.trim().toLowerCase() === 'image' || img.name.trim() === '') {
+      return false;
+    }
+  }
+  return true;
+}
+
+// Widget API: Listen for Jotform next/submit
+window.addEventListener('message', function(e) {
+  if (e.data && (e.data.type === 'next' || e.data.type === 'submit')) {
+    if (!validateImageNames()) {
+      renameWarning.style.display = 'block';
+      window.parent.postMessage({ action: 'cancelSubmission', reason: 'Please rename all images.' }, '*');
+      return;
+    }
+    renameWarning.style.display = 'none';
+    Promise.all(images.map((img, idx) => uploadToDrive(img, idx)))
+      .then(links => {
+        // Show links in the widget
+        imagesDiv.innerHTML += '<div><b>Uploaded to Google Drive:</b><br>' + links.map(link => `<a href="${link}" target="_blank">${link}</a>`).join('<br>') + '</div>';
+        // Optionally, trigger Jotform submit
         window.parent.postMessage({ action: 'submit' }, '*');
         clearImagesFromStorage();
-      }
-    });
-
-    async function uploadToDrive(img, idx) {
-      const formFolderId = await getOrCreateSubfolder(FORM_FOLDER_NAME, DRIVE_ROOT_FOLDER_ID);
-      const fileName = `${submissionPrefix}_${img.name}.png`;
-      console.log('Uploading image:', fileName, 'to folder:', formFolderId);
-      return fetch(CLOUD_FUNCTION_URL, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          imageBase64: img.dataUrl.split(',')[1],
-          fileName: fileName,
-          folderId: formFolderId
-        })
       })
-      .then(res => res.json())
-      .then(data => {
-        console.log('Upload response:', data);
-        return data.webViewLink || 'Upload failed';
+      .catch(() => {
+        window.parent.postMessage({ action: 'cancelSubmission', reason: 'Upload failed.' }, '*');
       });
-    }
+  }
+});
 
-    async function getOrCreateSubfolder(folderName, parentId) {
-      const cacheKey = 'subfolder_' + parentId + '_' + folderName;
-      let cached = localStorage.getItem(cacheKey);
-      if (cached) return cached;
+// Upload to Drive, using hardcoded folder and unique filename prefix
+async function uploadToDrive(img, idx) {
+  // 1. Create/get subfolder for this form (hardcoded)
+  const formFolderId = await getOrCreateSubfolder(FORM_FOLDER_NAME, DRIVE_ROOT_FOLDER_ID);
+  // 2. Upload image with name: submission_{timestamp}_image{idx+1}.png
+  const fileName = `${submissionPrefix}_image${idx + 1}.png`;
+  // --- Debug: log before fetch ---
+  console.log('Uploading image:', fileName, 'to folder:', formFolderId);
+  return fetch(CLOUD_FUNCTION_URL, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      imageBase64: img.dataUrl.split(',')[1],
+      fileName: fileName,
+      folderId: formFolderId
+    })
+  })
+  .then(res => res.json())
+  .then(data => {
+    // --- Debug: log after fetch ---
+    console.log('Upload response:', data);
+    return data.webViewLink || 'Upload failed';
+  });
+}
 
-      const res = await fetch(CLOUD_FUNCTION_URL + '/createSubfolder', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ formName: folderName, parentId })
-      });
-      const data = await res.json();
-      if (data.folderId) {
-        localStorage.setItem(cacheKey, data.folderId);
-        return data.folderId;
+// Helper: Create or get subfolder for form
+async function getOrCreateSubfolder(folderName, parentId) {
+  const cacheKey = 'subfolder_' + parentId + '_' + folderName;
+  let cached = localStorage.getItem(cacheKey);
+  if (cached) return cached;
+
+  const res = await fetch(CLOUD_FUNCTION_URL + '/createSubfolder', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ formName: folderName, parentId })
+  });
+  const data = await res.json();
+  if (data.folderId) {
+    localStorage.setItem(cacheKey, data.folderId);
+    return data.folderId;
+  }
+  return parentId;
+}
+
+// --- Load images from storage on page load ---
+loadImagesFromStorage();
+
+function isDefaultName(name) {
+  return name.startsWith('defaultPage_') || name.startsWith(PAGE_ID + '_');
+}
+
+batchUploadBtn.addEventListener('click', async function() {
+  // Check for default names
+  let hasDefault = images.some(img => isDefaultName(img.name));
+  if (hasDefault) {
+    alert('Please rename all images before uploading!');
+    return;
+  }
+  for (let idx = 0; idx < images.length; idx++) {
+    let img = images[idx];
+    if (img.status !== 'success') {
+      img.status = 'uploading';
+      renderImages();
+      saveImagesToStorage();
+      try {
+        const link = await uploadToDrive(img, idx);
+        img.status = 'success';
+        img.link = link;
+      } catch {
+        img.status = 'error';
       }
-      return parentId;
+      renderImages();
+      saveImagesToStorage();
     }
-    clearImagesFromStorage(); 
-    loadImagesFromStorage();
+  }
+}); 
   </script>
 </body>
 </html>
