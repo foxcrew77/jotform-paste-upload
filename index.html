@@ -128,7 +128,7 @@
   </div>
   <div id="blocker">Please upload all images before submitting the form.</div>
   <script>
-   // --- Hardcoded folder name for all uploads ---
+    // --- Hardcoded folder name for all uploads ---
 const FORM_FOLDER_NAME = "(Before DR Swing) Sabah Gov DR Drill 2025 Checklist";
 
 // --- Identify page via URL param (for per-page storage) ---
@@ -169,10 +169,10 @@ function getStorageKey() {
   return 'jotform_images_' + FORM_FOLDER_NAME + '_' + PAGE_ID;
 }
 function saveImagesToStorage() {
-  sessionStorage.setItem(getStorageKey(), JSON.stringify(images));
+  localStorage.setItem(getStorageKey(), JSON.stringify(images));
 }
 function loadImagesFromStorage() {
-  const stored = sessionStorage.getItem(getStorageKey());
+  const stored = localStorage.getItem(getStorageKey());
   if (stored) {
     try {
       const arr = JSON.parse(stored);
@@ -186,7 +186,7 @@ function loadImagesFromStorage() {
   }
 }
 function clearImagesFromStorage() {
-  sessionStorage.removeItem(getStorageKey());
+  localStorage.removeItem(getStorageKey());
 }
 
 function addImage(file) {
@@ -357,6 +357,7 @@ async function getOrCreateSubfolder(folderName, parentId) {
 }
 
 // --- Load images from storage on page load ---
+// clearImagesFromStorage();
 loadImagesFromStorage();
 
 function isDefaultName(name) {
