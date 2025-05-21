@@ -128,6 +128,18 @@
   </div>
   <div id="blocker">Please upload all images before submitting the form.</div>
   <script>
+    function getQueryParam(name) {
+  const url = new URL(window.location.href);
+  return url.searchParams.get(name) || '';
+}
+
+const firstName = getQueryParam('firstName');
+const lastName = getQueryParam('lastName');
+const fullName = getQueryParam('fullName');
+
+console.log('First Name:', firstName);
+console.log('Last Name:', lastName);
+console.log('Full Name:', fullName);
   // --- Hardcoded folder name for all uploads ---
 const FORM_FOLDER_NAME = "(Before DR Swing) Sabah Gov DR Drill 2025 Checklist";
 
