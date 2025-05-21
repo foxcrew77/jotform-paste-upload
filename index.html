@@ -128,7 +128,7 @@
   </div>
   <div id="blocker">Please upload all images before submitting the form.</div>
   <script>
-    // --- Hardcoded folder name for all uploads ---
+  // --- Hardcoded folder name for all uploads ---
 const FORM_FOLDER_NAME = "(Before DR Swing) Sabah Gov DR Drill 2025 Checklist";
 
 // --- Identify page via URL param (for per-page storage) ---
@@ -169,10 +169,10 @@ function getStorageKey() {
   return 'jotform_images_' + FORM_FOLDER_NAME + '_' + PAGE_ID;
 }
 function saveImagesToStorage() {
-  localStorage.setItem(getStorageKey(), JSON.stringify(images));
+  sessionStorage.setItem(getStorageKey(), JSON.stringify(images));
 }
 function loadImagesFromStorage() {
-  const stored = localStorage.getItem(getStorageKey());
+  const stored = sessionStorage.getItem(getStorageKey());
   if (stored) {
     try {
       const arr = JSON.parse(stored);
@@ -186,7 +186,7 @@ function loadImagesFromStorage() {
   }
 }
 function clearImagesFromStorage() {
-  localStorage.removeItem(getStorageKey());
+  sessionStorage.removeItem(getStorageKey());
 }
 
 function addImage(file) {
@@ -228,7 +228,7 @@ function renderImages() {
     row.innerHTML = `
       <img src="${img.dataUrl}" class="img-preview">
       <input class="img-name" type="text" value="${img.name}" placeholder="Image name">
-      ${img.status !== 'success' ? '<button class="delete-btn" title="Delete this image">🗑️</button>' : ''}
+      <button class="delete-btn" title="Delete this image">🗑️</button>
       <span class="img-status" id="status${idx}">
         ${img.status === 'uploading' ? '⏳' : img.status === 'success' ? '✔️' : img.status === 'error' ? '❌' : ''}
       </span>
@@ -238,15 +238,21 @@ function renderImages() {
       img.name = e.target.value;
       saveImagesToStorage();
     });
-    if (img.status !== 'success') {
-      row.querySelector('.delete-btn').addEventListener('click', () => {
-        images.splice(idx, 1);
-        renderImages();
-        saveImagesToStorage();
-      });
-    }
+    row.querySelector('.delete-btn').addEventListener('click', () => {
+      images.splice(idx, 1);
+      renderImages();
+      saveImagesToStorage();
+    });
     imagesDiv.appendChild(row);
   });
+
+  // Show the upload button if there are images
+  const batchUploadBtn = document.getElementById('batchUploadBtn');
+  if (images.length > 0) {
+    batchUploadBtn.style.display = '';
+  } else {
+    batchUploadBtn.style.display = 'none';
+  }
 }
 
 dropzone.addEventListener('paste', function(e) {
@@ -289,10 +295,20 @@ function validateImageNames() {
   return true;
 }
 
+function isDefaultName(name) {
+  // Checks for default/placeholder names. Update this logic for Jotform integration later.
+  return (
+    name.trim().toLowerCase() === 'image' ||
+    name.trim() === '' ||
+    name.startsWith('defaultPage_') ||
+    name.startsWith(PAGE_ID + '_')
+  );
+}
+
 // Widget API: Listen for Jotform next/submit
 window.addEventListener('message', function(e) {
   if (e.data && (e.data.type === 'next' || e.data.type === 'submit')) {
-    if (!validateImageNames()) {
+    if (images.some(img => isDefaultName(img.name))) {
       renameWarning.style.display = 'block';
       window.parent.postMessage({ action: 'cancelSubmission', reason: 'Please rename all images.' }, '*');
       return;
@@ -312,12 +328,12 @@ window.addEventListener('message', function(e) {
   }
 });
 
-// Upload to Drive, using hardcoded folder and unique filename prefix
+// Upload to Drive, using hardcoded prefix for now
 async function uploadToDrive(img, idx) {
   // 1. Create/get subfolder for this form (hardcoded)
   const formFolderId = await getOrCreateSubfolder(FORM_FOLDER_NAME, DRIVE_ROOT_FOLDER_ID);
-  // 2. Upload image with name: submission_{timestamp}_image{idx+1}.png
-  const fileName = `${submissionPrefix}_image${idx + 1}.png`;
+  // 2. Hardcoded image name prefix. TODO: Make this dynamic for Jotform integration.
+  const fileName = `PREFIX_${img.name}.png`; // <-- Change 'PREFIX_' as needed
   // --- Debug: log before fetch ---
   console.log('Uploading image:', fileName, 'to folder:', formFolderId);
   return fetch(CLOUD_FUNCTION_URL, {
@@ -357,12 +373,7 @@ async function getOrCreateSubfolder(folderName, parentId) {
 }
 
 // --- Load images from storage on page load ---
-// clearImagesFromStorage();
 loadImagesFromStorage();
-
-function isDefaultName(name) {
-  return name.startsWith('defaultPage_') || name.startsWith(PAGE_ID + '_');
-}
 
 batchUploadBtn.addEventListener('click', async function() {
   // Check for default names
