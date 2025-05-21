@@ -153,12 +153,43 @@ if (!SUBMISSION_CODE) {
 }
 const submissionPrefix = 'submission_' + Date.now();
 
+// Rename image prefix automatically with testID
 function getQueryParam(name) {
   const url = new URL(window.location.href);
   return url.searchParams.get(name) || '';
 }
 
-let driveField = getQueryParam('driveField') || '';
+// Place this after getQueryParam:
+const testID = getQueryParam('testID') || '';
+const testNum = testID ? testID.slice(-1) : '';
+
+function addImage(file) {
+  const reader = new FileReader();
+  reader.onload = function(e) {
+    const imgObj = {
+      file: null,
+      dataUrl: e.target.result,
+      // Pre-fill with testNum + '_' if available
+      name: testNum ? (testNum + '_') : file.name.replace(/\.[^/.]+$/, ""),
+      status: undefined,
+      link: undefined
+    };
+    images.push(imgObj);
+    renderImages();
+    saveImagesToStorage();
+    setTimeout(() => {
+      const inputs = document.querySelectorAll('.img-name');
+      if (inputs.length) {
+        const lastInput = inputs[inputs.length - 1];
+        lastInput.focus();
+        lastInput.setSelectionRange(lastInput.value.length, lastInput.value.length);
+      }
+    }, 0);
+  };
+  reader.readAsDataURL(file);
+}
+
+// let driveField = getQueryParam('driveField') || '';
 const dropzone = document.getElementById('dropzone');
 const imagesDiv = document.getElementById('images');
 const renameWarning = document.getElementById('renameWarning');
@@ -206,10 +237,14 @@ function addImage(file) {
     renderImages();
     saveImagesToStorage();
     // Improvement: Auto-focus the last image's rename box
-setTimeout(() => {
-  const inputs = document.querySelectorAll('.img-name');
-  if (inputs.length) inputs[inputs.length - 1].focus();
-}, 0);
+    setTimeout(() => {
+    const inputs = document.querySelectorAll('.img-name');
+    if (inputs.length) {
+    const lastInput = inputs[inputs.length - 1];
+    lastInput.focus();
+    lastInput.select(); // Improvement: highlight all text for easy overwrite
+      }
+    }, 0);
   };
   reader.readAsDataURL(file);
 }
