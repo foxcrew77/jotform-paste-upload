@@ -133,13 +133,13 @@
   return url.searchParams.get(name) || '';
 }
 
-const firstName = getQueryParam('firstName');
-const lastName = getQueryParam('lastName');
 const fullName = getQueryParam('fullName');
+const testName = getQueryParam('testName');
+const uniqueID = getQueryParam('uniqueID');
 
-console.log('First Name:', firstName);
-console.log('Last Name:', lastName);
 console.log('Full Name:', fullName);
+console.log('Test Name:', testName);
+console.log('unique IDID:', uniqueID);
   // --- Hardcoded folder name for all uploads ---
 const FORM_FOLDER_NAME = "(Before DR Swing) Sabah Gov DR Drill 2025 Checklist";
 
@@ -158,12 +158,6 @@ function getQueryParam(name) {
 // Get Jotform data from URL (not used for naming anymore)
 let driveField = getQueryParam('driveField') || '';
 
-// Log all query params for debugging
-console.log('formName:', getQueryParam('formName') || 'DefaultForm');
-console.log('submissionId:', getQueryParam('submissionId') || 'NoID');
-console.log('userName:', getQueryParam('userName') || 'NoName');
-console.log('organization:', getQueryParam('organization') || 'NoOrg');
-console.log('driveField:', driveField);
 // alert('formName: ' + (getQueryParam('formName') || 'DefaultForm') + '\nsubmissionId: ' + (getQueryParam('submissionId') || 'NoID') + '\nuserName: ' + (getQueryParam('userName') || 'NoName') + '\norganization: ' + (getQueryParam('organization') || 'NoOrg') + '\ndriveField: ' + driveField);
 
 const dropzone = document.getElementById('dropzone');
