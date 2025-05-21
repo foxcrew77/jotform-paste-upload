@@ -143,7 +143,12 @@ const PAGE_ID = getQueryParam('pageId') || 'defaultPage';
 const CODE_KEY = 'jotform_submission_code';
 let SUBMISSION_CODE = localStorage.getItem(CODE_KEY);
 if (!SUBMISSION_CODE) {
-  SUBMISSION_CODE = 'SUB_' + Date.now() + '_' + Math.floor(Math.random() * 10000);
+  // SUBMISSION_CODE = 'SUB_' + Date.now() + '_' + Math.floor(Math.random() * 10000);
+  // localStorage.setItem(CODE_KEY, SUBMISSION_CODE);
+  // Shorten: Use last 6 digits of timestamp + 3 random letters
+  const ts = Date.now().toString().slice(-6);
+  const rand = Math.random().toString(36).substring(2, 5).toUpperCase();
+  SUBMISSION_CODE = 'S' + ts + rand;
   localStorage.setItem(CODE_KEY, SUBMISSION_CODE);
 }
 const submissionPrefix = 'submission_' + Date.now();
@@ -200,6 +205,11 @@ function addImage(file) {
     images.push(imgObj);
     renderImages();
     saveImagesToStorage();
+    // Improvement: Auto-focus the last image's rename box
+setTimeout(() => {
+  const inputs = document.querySelectorAll('.img-name');
+  if (inputs.length) inputs[inputs.length - 1].focus();
+}, 0);
   };
   reader.readAsDataURL(file);
 }
