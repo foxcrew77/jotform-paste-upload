@@ -163,6 +163,9 @@ function getQueryParam(name) {
 const testID = getQueryParam('testID') || '';
 const testNum = testID ? testID.slice(-1) : '';
 
+console.log('test:', testID);
+console.log('testNum:', testNum);
+
 function addImage(file) {
   const reader = new FileReader();
   reader.onload = function(e) {
@@ -223,31 +226,32 @@ function clearImagesFromStorage() {
   sessionStorage.removeItem(getStorageKey());
 }
 
-function addImage(file) {
-  const reader = new FileReader();
-  reader.onload = function(e) {
-    const imgObj = {
-      file: null,
-      dataUrl: e.target.result,
-      name: file.name.replace(/\.[^/.]+$/, ""),
-      status: undefined,
-      link: undefined
-    };
-    images.push(imgObj);
-    renderImages();
-    saveImagesToStorage();
-    // Improvement: Auto-focus the last image's rename box
-    setTimeout(() => {
-    const inputs = document.querySelectorAll('.img-name');
-    if (inputs.length) {
-    const lastInput = inputs[inputs.length - 1];
-    lastInput.focus();
-    lastInput.select(); // Improvement: highlight all text for easy overwrite
-      }
-    }, 0);
-  };
-  reader.readAsDataURL(file);
-}
+// old addImage function - automatically hightlight image name and put cursror at the end of the image name
+// function addImage(file) {
+//   const reader = new FileReader();
+//   reader.onload = function(e) {
+//     const imgObj = {
+//       file: null,
+//       dataUrl: e.target.result,
+//       name: file.name.replace(/\.[^/.]+$/, ""),
+//       status: undefined,
+//       link: undefined
+//     };
+//     images.push(imgObj);
+//     renderImages();
+//     saveImagesToStorage();
+//     // Improvement: Auto-focus the last image's rename box
+//     setTimeout(() => {
+//     const inputs = document.querySelectorAll('.img-name');
+//     if (inputs.length) {
+//     const lastInput = inputs[inputs.length - 1];
+//     lastInput.focus();
+//     lastInput.select(); // Improvement: highlight all text for easy overwrite
+//       }
+//     }, 0);
+//   };
+//   reader.readAsDataURL(file);
+// }
 
 function renderImages() {
   const instructionsDiv = document.getElementById('instructions');
