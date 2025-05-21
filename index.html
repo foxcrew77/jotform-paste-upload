@@ -128,51 +128,24 @@
   </div>
   <div id="blocker">Please upload all images before submitting the form.</div>
   <script>
-    function getQueryParam(name) {
-  const url = new URL(window.location.href);
-  return url.searchParams.get(name) || '';
-}
-
-const fullName = getQueryParam('fullName');
-const org = getQueryParam('org');
-const testName = getQueryParam('testName');
-const uniqueID = getQueryParam('uniqueID');
-
-console.log('Full Name:', fullName);
-console.log('Organization:', org);
-console.log('Test Name:', testName);
-console.log('unique IDID:', uniqueID);
-  // --- Hardcoded folder name for all uploads ---
+// --- Hardcoded folder name for all uploads ---
 const FORM_FOLDER_NAME = "(Before DR Swing) Sabah Gov DR Drill 2025 Checklist";
-
-// --- Identify page via URL param (for per-page storage) ---
 const PAGE_ID = getQueryParam('pageId') || 'defaultPage';
-
-// --- Helper to get a unique prefix for this submission ---
 const submissionPrefix = 'submission_' + Date.now();
 
-// --- Helper to get URL params (not used for naming anymore, but kept for future use) ---
 function getQueryParam(name) {
   const url = new URL(window.location.href);
   return url.searchParams.get(name) || '';
 }
 
-// Get Jotform data from URL (not used for naming anymore)
 let driveField = getQueryParam('driveField') || '';
-
-// alert('formName: ' + (getQueryParam('formName') || 'DefaultForm') + '\nsubmissionId: ' + (getQueryParam('submissionId') || 'NoID') + '\nuserName: ' + (getQueryParam('userName') || 'NoName') + '\norganization: ' + (getQueryParam('organization') || 'NoOrg') + '\ndriveField: ' + driveField);
-
 const dropzone = document.getElementById('dropzone');
 const imagesDiv = document.getElementById('images');
 const renameWarning = document.getElementById('renameWarning');
 let images = [];
-
-// Your Cloud Function URL (should not change)
 const CLOUD_FUNCTION_URL = 'https://asia-southeast1-jotform-paste-upload.cloudfunctions.net/uploadImage';
-// Your Google Drive root folder ID (parent folder for all forms)
 const DRIVE_ROOT_FOLDER_ID = '1VFvqcSDShsIdKbY1yAkEdbxgLH6ppYyl';
 
-// --- Persistence helpers ---
 function getStorageKey() {
   return 'jotform_images_' + FORM_FOLDER_NAME + '_' + PAGE_ID;
 }
@@ -203,7 +176,7 @@ function addImage(file) {
     const imgObj = {
       file: null,
       dataUrl: e.target.result,
-      name: file.name.replace(/\.[^/.]+$/, "") // name without extension
+      name: file.name.replace(/\.[^/.]+$/, "")
     };
     images.push(imgObj);
     renderImages();
@@ -254,7 +227,6 @@ function renderImages() {
     imagesDiv.appendChild(row);
   });
 
-  // Show the upload button if there are images
   const batchUploadBtn = document.getElementById('batchUploadBtn');
   if (images.length > 0) {
     batchUploadBtn.style.display = '';
@@ -272,7 +244,6 @@ dropzone.addEventListener('paste', function(e) {
     }
   }
 });
-
 dropzone.addEventListener('dragover', function(e) {
   e.preventDefault();
   dropzone.style.background = '#e0e0e0';
@@ -289,7 +260,6 @@ dropzone.addEventListener('drop', function(e) {
     }
   }
 });
-
 dropzone.addEventListener('click', function() {
   dropzone.focus();
 });
@@ -302,9 +272,7 @@ function validateImageNames() {
   }
   return true;
 }
-
 function isDefaultName(name) {
-  // Checks for default/placeholder names. Update this logic for Jotform integration later.
   return (
     name.trim().toLowerCase() === 'image' ||
     name.trim() === '' ||
@@ -313,7 +281,6 @@ function isDefaultName(name) {
   );
 }
 
-// Widget API: Listen for Jotform next/submit
 window.addEventListener('message', function(e) {
   if (e.data && (e.data.type === 'next' || e.data.type === 'submit')) {
     if (images.some(img => isDefaultName(img.name))) {
@@ -324,9 +291,7 @@ window.addEventListener('message', function(e) {
     renameWarning.style.display = 'none';
     Promise.all(images.map((img, idx) => uploadToDrive(img, idx)))
       .then(links => {
-        // Show links in the widget
         imagesDiv.innerHTML += '<div><b>Uploaded to Google Drive:</b><br>' + links.map(link => `<a href="${link}" target="_blank">${link}</a>`).join('<br>') + '</div>';
-        // Optionally, trigger Jotform submit
         window.parent.postMessage({ action: 'submit' }, '*');
         clearImagesFromStorage();
       })
@@ -336,13 +301,9 @@ window.addEventListener('message', function(e) {
   }
 });
 
-// Upload to Drive, using hardcoded prefix for now
 async function uploadToDrive(img, idx) {
-  // 1. Create/get subfolder for this form (hardcoded)
   const formFolderId = await getOrCreateSubfolder(FORM_FOLDER_NAME, DRIVE_ROOT_FOLDER_ID);
-  // 2. Hardcoded image name prefix. TODO: Make this dynamic for Jotform integration.
   const fileName = `PREFIX_${img.name}.png`; // <-- Change 'PREFIX_' as needed
-  // --- Debug: log before fetch ---
   console.log('Uploading image:', fileName, 'to folder:', formFolderId);
   return fetch(CLOUD_FUNCTION_URL, {
     method: 'POST',
@@ -355,18 +316,15 @@ async function uploadToDrive(img, idx) {
   })
   .then(res => res.json())
   .then(data => {
-    // --- Debug: log after fetch ---
     console.log('Upload response:', data);
     return data.webViewLink || 'Upload failed';
   });
 }
 
-// Helper: Create or get subfolder for form
 async function getOrCreateSubfolder(folderName, parentId) {
   const cacheKey = 'subfolder_' + parentId + '_' + folderName;
   let cached = localStorage.getItem(cacheKey);
   if (cached) return cached;
-
   const res = await fetch(CLOUD_FUNCTION_URL + '/createSubfolder', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -380,11 +338,10 @@ async function getOrCreateSubfolder(folderName, parentId) {
   return parentId;
 }
 
-// --- Load images from storage on page load ---
 loadImagesFromStorage();
 
+const batchUploadBtn = document.getElementById('batchUploadBtn');
 batchUploadBtn.addEventListener('click', async function() {
-  // Check for default names
   let hasDefault = images.some(img => isDefaultName(img.name));
   if (hasDefault) {
     alert('Please rename all images before uploading!');
@@ -407,7 +364,19 @@ batchUploadBtn.addEventListener('click', async function() {
       saveImagesToStorage();
     }
   }
-}); 
+  // After all uploads, collect the links and send to Jotform
+  const driveLinks = images.map(img => img.link).filter(Boolean);
+  if (driveLinks.length > 0) {
+    sendToJotform(driveLinks.join(', '));
+  }
+});
+
+function sendToJotform(value) {
+  window.parent.postMessage({ action: 'setValue', value: value }, '*');
+}
+  </script>
+</body>
+</html>
   </script>
 </body>
 </html>
