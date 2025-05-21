@@ -46,7 +46,7 @@
       border: 1px solid #ccc;
       font-size: 1em;
     }
-    .delete-btn {
+    .delete-btn, .retry-btn {
       background: #f8d7da;
       color: #721c24;
       border: none;
@@ -57,7 +57,7 @@
       transition: background 0.2s;
       margin-left: 2px;
     }
-    .delete-btn:hover {
+    .delete-btn:hover, .retry-btn:hover {
       background: #f5c6cb;
     }
     .rename-warning {
@@ -107,6 +107,12 @@
       color: #d9534f;
       font-weight: bold;
     }
+    #uploadProgressMsg {
+      color: #007bff;
+      font-size: 1em;
+      margin-bottom: 0.5em;
+      font-weight: 600;
+    }
   </style>
 </head>
 <body>
@@ -122,15 +128,18 @@
     </div>
   </div>
   <div id="renameWarning" class="rename-warning" style="display:none;">Please rename all images before submitting!</div>
+  <div id="uploadProgressMsg" style="display:none;"></div> <!-- Improvement 3: Progress feedback -->
   <div id="images"></div>
   <div id="stickyUploadBar">
     <button id="batchUploadBtn" style="display:none;">Upload All Images</button>
   </div>
-  <div id="blocker">Please upload all images before submitting the form.</div>
+  <div id="blocker">Please wait, uploads in progress. Do not navigate away or submit the form.</div>
   <script>
-// --- Hardcoded folder name for all uploads ---
+/* --- Hardcoded folder name for all uploads --- */
 const FORM_FOLDER_NAME = "(Before DR Swing) Sabah Gov DR Drill 2025 Checklist";
 const PAGE_ID = getQueryParam('pageId') || 'defaultPage';
+// Improvement 5: Use uniqueID from URL or hardcoded fallback
+const UNIQUE_ID = getQueryParam('uniqueID') || 'HARDCODED_UNIQUE_ID_' + PAGE_ID;
 const submissionPrefix = 'submission_' + Date.now();
 
 function getQueryParam(name) {
@@ -142,6 +151,8 @@ let driveField = getQueryParam('driveField') || '';
 const dropzone = document.getElementById('dropzone');
 const imagesDiv = document.getElementById('images');
 const renameWarning = document.getElementById('renameWarning');
+const uploadProgressMsg = document.getElementById('uploadProgressMsg');
+const blocker = document.getElementById('blocker');
 let images = [];
 const CLOUD_FUNCTION_URL = 'https://asia-southeast1-jotform-paste-upload.cloudfunctions.net/uploadImage';
 const DRIVE_ROOT_FOLDER_ID = '1VFvqcSDShsIdKbY1yAkEdbxgLH6ppYyl';
@@ -176,7 +187,9 @@ function addImage(file) {
     const imgObj = {
       file: null,
       dataUrl: e.target.result,
-      name: file.name.replace(/\.[^/.]+$/, "")
+      name: file.name.replace(/\.[^/.]+$/, ""),
+      status: undefined,
+      link: undefined
     };
     images.push(imgObj);
     renderImages();
@@ -214,6 +227,7 @@ function renderImages() {
         ${img.status === 'uploading' ? '⏳' : img.status === 'success' ? '✔️' : img.status === 'error' ? '❌' : ''}
       </span>
       <span class="img-link" id="link${idx}">${img.link ? `<a href="${img.link}" target="_blank">View</a>` : ''}</span>
+      ${img.status === 'error' ? `<button class="retry-btn" data-idx="${idx}" title="Retry upload">🔄 Retry</button>` : ''}
     `;
     row.querySelector('.img-name').addEventListener('input', e => {
       img.name = e.target.value;
@@ -224,6 +238,23 @@ function renderImages() {
       renderImages();
       saveImagesToStorage();
     });
+    // Improvement 4: Retry logic for failed uploads
+    if (img.status === 'error') {
+      row.querySelector('.retry-btn').addEventListener('click', async () => {
+        img.status = 'uploading';
+        renderImages();
+        saveImagesToStorage();
+        try {
+          const link = await uploadToDrive(img, idx);
+          img.status = 'success';
+          img.link = link;
+        } catch {
+          img.status = 'error';
+        }
+        renderImages();
+        saveImagesToStorage();
+      });
+    }
     imagesDiv.appendChild(row);
   });
 
@@ -281,29 +312,83 @@ function isDefaultName(name) {
   );
 }
 
+// Improvement 1: Block navigation until uploads finish
+let isUploading = false;
+function setUploadingState(uploading) {
+  isUploading = uploading;
+  blocker.style.display = uploading ? 'flex' : 'none';
+  // Improvement 2: Disable upload button during upload
+  batchUploadBtn.disabled = uploading;
+  // Improvement 3: Show/hide progress message
+  uploadProgressMsg.style.display = uploading ? '' : 'none';
+}
+
+// Widget API: Listen for Jotform next/submit
 window.addEventListener('message', function(e) {
   if (e.data && (e.data.type === 'next' || e.data.type === 'submit')) {
+    if (isUploading) {
+      // Block navigation if uploading
+      window.parent.postMessage({ action: 'cancelSubmission', reason: 'Uploads in progress. Please wait.' }, '*');
+      return;
+    }
     if (images.some(img => isDefaultName(img.name))) {
       renameWarning.style.display = 'block';
       window.parent.postMessage({ action: 'cancelSubmission', reason: 'Please rename all images.' }, '*');
       return;
     }
     renameWarning.style.display = 'none';
-    Promise.all(images.map((img, idx) => uploadToDrive(img, idx)))
-      .then(links => {
-        imagesDiv.innerHTML += '<div><b>Uploaded to Google Drive:</b><br>' + links.map(link => `<a href="${link}" target="_blank">${link}</a>`).join('<br>') + '</div>';
-        window.parent.postMessage({ action: 'submit' }, '*');
-        clearImagesFromStorage();
-      })
-      .catch(() => {
-        window.parent.postMessage({ action: 'cancelSubmission', reason: 'Upload failed.' }, '*');
-      });
+    // Start upload
+    batchUploadBtn.click();
   }
 });
 
+// Improvement 2, 3: Disable upload button and show progress
+const batchUploadBtn = document.getElementById('batchUploadBtn');
+batchUploadBtn.addEventListener('click', async function() {
+  let hasDefault = images.some(img => isDefaultName(img.name));
+  if (hasDefault) {
+    alert('Please rename all images before uploading!');
+    return;
+  }
+  setUploadingState(true); // Improvement 1, 2, 3
+  uploadProgressMsg.textContent = `Uploading ${images.length} image(s)...`;
+  let completed = 0;
+  for (let idx = 0; idx < images.length; idx++) {
+    let img = images[idx];
+    if (img.status !== 'success') {
+      img.status = 'uploading';
+      renderImages();
+      saveImagesToStorage();
+      try {
+        const link = await uploadToDrive(img, idx);
+        img.status = 'success';
+        img.link = link;
+      } catch {
+        img.status = 'error';
+      }
+      completed++;
+      uploadProgressMsg.textContent = `Uploading ${images.length} image(s)... (${completed}/${images.length})`;
+      renderImages();
+      saveImagesToStorage();
+    }
+  }
+  setUploadingState(false); // Improvement 1, 2, 3
+  uploadProgressMsg.textContent = '';
+  // After all uploads, collect the links and send to Jotform
+  const driveLinks = images.map(img => img.link).filter(Boolean);
+  if (driveLinks.length > 0) {
+    sendToJotform(driveLinks.join(', '));
+  }
+});
+
+function sendToJotform(value) {
+  window.parent.postMessage({ action: 'setValue', value: value }, '*');
+}
+
+// Improvement 5: Add uniqueID to file name
 async function uploadToDrive(img, idx) {
   const formFolderId = await getOrCreateSubfolder(FORM_FOLDER_NAME, DRIVE_ROOT_FOLDER_ID);
-  const fileName = `PREFIX_${img.name}.png`; // <-- Change 'PREFIX_' as needed
+  const fileName = `${UNIQUE_ID}_${img.name}.png`; // <-- uniqueID prefix
   console.log('Uploading image:', fileName, 'to folder:', formFolderId);
   return fetch(CLOUD_FUNCTION_URL, {
     method: 'POST',
@@ -339,44 +424,6 @@ async function getOrCreateSubfolder(folderName, parentId) {
 }
 
 loadImagesFromStorage();
-
-const batchUploadBtn = document.getElementById('batchUploadBtn');
-batchUploadBtn.addEventListener('click', async function() {
-  let hasDefault = images.some(img => isDefaultName(img.name));
-  if (hasDefault) {
-    alert('Please rename all images before uploading!');
-    return;
-  }
-  for (let idx = 0; idx < images.length; idx++) {
-    let img = images[idx];
-    if (img.status !== 'success') {
-      img.status = 'uploading';
-      renderImages();
-      saveImagesToStorage();
-      try {
-        const link = await uploadToDrive(img, idx);
-        img.status = 'success';
-        img.link = link;
-      } catch {
-        img.status = 'error';
-      }
-      renderImages();
-      saveImagesToStorage();
-    }
-  }
-  // After all uploads, collect the links and send to Jotform
-  const driveLinks = images.map(img => img.link).filter(Boolean);
-  if (driveLinks.length > 0) {
-    sendToJotform(driveLinks.join(', '));
-  }
-});
-
-function sendToJotform(value) {
-  window.parent.postMessage({ action: 'setValue', value: value }, '*');
-}
-  </script>
-</body>
-</html>
   </script>
 </body>
 </html>
