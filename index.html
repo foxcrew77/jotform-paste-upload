@@ -128,7 +128,7 @@
     </div>
   </div>
   <div id="renameWarning" class="rename-warning" style="display:none;">Please rename all images before submitting!</div>
-  <div id="uploadProgressMsg" style="display:none;"></div> <!-- Improvement 3: Progress feedback -->
+  <div id="uploadProgressMsg" style="display:none;"></div>
   <div id="images"></div>
   <div id="stickyUploadBar">
     <button id="batchUploadBtn" style="display:none;">Upload All Images</button>
@@ -138,8 +138,14 @@
 /* --- Hardcoded folder name for all uploads --- */
 const FORM_FOLDER_NAME = "(Before DR Swing) Sabah Gov DR Drill 2025 Checklist";
 const PAGE_ID = getQueryParam('pageId') || 'defaultPage';
-// Improvement 5: Use uniqueID from URL or hardcoded fallback
-const UNIQUE_ID = getQueryParam('uniqueID') || 'HARDCODED_UNIQUE_ID_' + PAGE_ID;
+
+// Improvement 5: Shared submission code for all widgets on the same submission
+const CODE_KEY = 'jotform_submission_code';
+let SUBMISSION_CODE = localStorage.getItem(CODE_KEY);
+if (!SUBMISSION_CODE) {
+  SUBMISSION_CODE = 'SUB_' + Date.now() + '_' + Math.floor(Math.random() * 10000);
+  localStorage.setItem(CODE_KEY, SUBMISSION_CODE);
+}
 const submissionPrefix = 'submission_' + Date.now();
 
 function getQueryParam(name) {
@@ -323,11 +329,10 @@ function setUploadingState(uploading) {
   uploadProgressMsg.style.display = uploading ? '' : 'none';
 }
 
-// Widget API: Listen for Jotform next/submit
+// Improvement 1: Block navigation on Jotform next/submit if uploading
 window.addEventListener('message', function(e) {
   if (e.data && (e.data.type === 'next' || e.data.type === 'submit')) {
     if (isUploading) {
-      // Block navigation if uploading
       window.parent.postMessage({ action: 'cancelSubmission', reason: 'Uploads in progress. Please wait.' }, '*');
       return;
     }
@@ -337,7 +342,7 @@ window.addEventListener('message', function(e) {
       return;
     }
     renameWarning.style.display = 'none';
-    // Start upload
+    // Improvement 2: Start upload on navigation/submit
     batchUploadBtn.click();
   }
 });
@@ -381,14 +386,15 @@ batchUploadBtn.addEventListener('click', async function() {
   }
 });
 
+// Improvement: Send value to Jotform widget output
 function sendToJotform(value) {
   window.parent.postMessage({ action: 'setValue', value: value }, '*');
 }
 
-// Improvement 5: Add uniqueID to file name
+// Improvement 5: Use SUBMISSION_CODE as prefix for file name
 async function uploadToDrive(img, idx) {
   const formFolderId = await getOrCreateSubfolder(FORM_FOLDER_NAME, DRIVE_ROOT_FOLDER_ID);
-  const fileName = `${UNIQUE_ID}_${img.name}.png`; // <-- uniqueID prefix
+  const fileName = `${SUBMISSION_CODE}_${img.name}.png`; // <-- shared code prefix
   console.log('Uploading image:', fileName, 'to folder:', formFolderId);
   return fetch(CLOUD_FUNCTION_URL, {
     method: 'POST',
@@ -405,6 +411,9 @@ async function uploadToDrive(img, idx) {
     return data.webViewLink || 'Upload failed';
   });
 }
+
+// Improvement 5: Send SUBMISSION_CODE to parent form as widget value (only once per load)
+window.parent.postMessage({ action: 'setValue', value: SUBMISSION_CODE }, '*');
 
 async function getOrCreateSubfolder(folderName, parentId) {
   const cacheKey = 'subfolder_' + parentId + '_' + folderName;
@@ -423,6 +432,7 @@ async function getOrCreateSubfolder(folderName, parentId) {
   return parentId;
 }
 
+// Improvement: Restore images from storage on load
 loadImagesFromStorage();
   </script>
 </body>
