@@ -136,8 +136,11 @@
   <div id="blocker">Please wait, uploads in progress. Do not navigate away or submit the form.</div>
   <script>
 /* --- Hardcoded folder name for all uploads --- */
-const FORM_FOLDER_NAME = "(Before DR Swing) Sabah Gov DR Drill 2025 Checklist";
-const PAGE_ID = getQueryParam('pageId') || 'defaultPage';
+const type = getQueryParam('type') || 'before';
+const BEFORE_FORM_FOLDER_NAME = "(Before DR Swing) Sabah Gov DR Drill 2025 Checklist";
+const DR_FORM_FOLDER_NAME = "(DR Swing) Sabah Gov DR Drill 2025 Checklist";
+const FORM_FOLDER_NAME = type === 'dr' ? DR_FORM_FOLDER_NAME : BEFORE_FORM_FOLDER_NAME;
+//const PAGE_ID = getQueryParam('pageId') || 'defaultPage';
 
 // Improvement 5: Shared submission code for all widgets on the same submission
 const CODE_KEY = 'jotform_submission_code';
@@ -148,7 +151,8 @@ if (!SUBMISSION_CODE) {
   // Shorten: Use last 6 digits of timestamp + 3 random letters
   const ts = Date.now().toString().slice(-6);
   const rand = Math.random().toString(36).substring(2, 5).toUpperCase();
-  SUBMISSION_CODE = 'S' + ts + rand;
+  const prefixLetter = type === 'dr' ? 'DR' : 'B'; 
+  SUBMISSION_CODE = prefixLetter + ts + rand;
   localStorage.setItem(CODE_KEY, SUBMISSION_CODE);
 }
 const submissionPrefix = 'submission_' + Date.now();
@@ -200,10 +204,10 @@ const uploadProgressMsg = document.getElementById('uploadProgressMsg');
 const blocker = document.getElementById('blocker');
 let images = [];
 const CLOUD_FUNCTION_URL = 'https://asia-southeast1-jotform-paste-upload.cloudfunctions.net/uploadImage';
-const DRIVE_ROOT_FOLDER_ID = '1VFvqcSDShsIdKbY1yAkEdbxgLH6ppYyl';
+const DRIVE_ROOT_FOLDER_ID = '1kgYWJW8fMvAHwsImAgLz6hBpYuuoVWag';
 
 function getStorageKey() {
-  return 'jotform_images_' + FORM_FOLDER_NAME + '_' + PAGE_ID;
+  return 'jotform_images_' + FORM_FOLDER_NAME + '_' + testID;
 }
 function saveImagesToStorage() {
   sessionStorage.setItem(getStorageKey(), JSON.stringify(images));
@@ -363,7 +367,7 @@ function isDefaultName(name) {
     name.trim().toLowerCase() === 'image' ||
     name.trim() === '' ||
     name.startsWith('defaultPage_') ||
-    name.startsWith(PAGE_ID + '_')
+    name.startsWith(testID + '_')
   );
 }
 
@@ -442,16 +446,19 @@ function sendToJotform(value) {
 
 // Improvement 5: Use SUBMISSION_CODE as prefix for file name
 async function uploadToDrive(img, idx) {
+  // Get or create the main form folder
   const formFolderId = await getOrCreateSubfolder(FORM_FOLDER_NAME, DRIVE_ROOT_FOLDER_ID);
+  // Get or create a subfolder for the submission code
+  const codeFolderId = await getOrCreateSubfolder(SUBMISSION_CODE, formFolderId);
   const fileName = `${SUBMISSION_CODE}_${img.name}.png`; // <-- shared code prefix
-  console.log('Uploading image:', fileName, 'to folder:', formFolderId);
+  console.log('Uploading image:', fileName, 'to folder:', codeFolderId);
   return fetch(CLOUD_FUNCTION_URL, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
       imageBase64: img.dataUrl.split(',')[1],
       fileName: fileName,
-      folderId: formFolderId
+      folderId: codeFolderId
     })
   })
   .then(res => res.json())
