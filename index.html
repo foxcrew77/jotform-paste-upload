@@ -75,7 +75,7 @@
       bottom: 0;
       left: 0;
       width: 100%;
-      background: #fff;
+      /* background: #fff; */
       padding: 10px 0 0 0;
       z-index: 100;
       display: flex;
@@ -143,18 +143,24 @@ const FORM_FOLDER_NAME = type === 'dr' ? DR_FORM_FOLDER_NAME : BEFORE_FORM_FOLDE
 //const PAGE_ID = getQueryParam('pageId') || 'defaultPage';
 
 // Improvement 5: Shared submission code for all widgets on the same submission
-const CODE_KEY = 'jotform_submission_code';
-let SUBMISSION_CODE = localStorage.getItem(CODE_KEY);
-if (!SUBMISSION_CODE) {
-  // SUBMISSION_CODE = 'SUB_' + Date.now() + '_' + Math.floor(Math.random() * 10000);
-  // localStorage.setItem(CODE_KEY, SUBMISSION_CODE);
-  // Shorten: Use last 6 digits of timestamp + 3 random letters
-  const ts = Date.now().toString().slice(-6);
-  const rand = Math.random().toString(36).substring(2, 5).toUpperCase();
-  const prefixLetter = type === 'dr' ? 'DR' : 'B'; 
-  SUBMISSION_CODE = prefixLetter + ts + rand;
-  localStorage.setItem(CODE_KEY, SUBMISSION_CODE);
-}
+// const CODE_KEY = 'jotform_submission_code';
+// let SUBMISSION_CODE = localStorage.getItem(CODE_KEY);
+// if (!SUBMISSION_CODE) {
+//   // SUBMISSION_CODE = 'SUB_' + Date.now() + '_' + Math.floor(Math.random() * 10000);
+//   // localStorage.setItem(CODE_KEY, SUBMISSION_CODE);
+//   // Shorten: Use last 6 digits of timestamp + 3 random letters
+//   const ts = Date.now().toString().slice(-6);
+//   const rand = Math.random().toString(36).substring(2, 5).toUpperCase();
+//   const prefixLetter = type === 'dr' ? 'DR' : 'B'; 
+//   SUBMISSION_CODE = prefixLetter + ts + rand;
+//   localStorage.setItem(CODE_KEY, SUBMISSION_CODE);
+// }
+// Always generate a new submission code on every load
+const ts = Date.now().toString().slice(-6);
+const rand = Math.random().toString(36).substring(2, 5).toUpperCase();
+const prefixLetter = type === 'dr' ? 'DR' : 'B'; 
+const SUBMISSION_CODE = prefixLetter + ts + rand;
+console.log('SUBMISSION_CODE:', SUBMISSION_CODE);
 const submissionPrefix = 'submission_' + Date.now();
 
 // Rename image prefix automatically with testID
