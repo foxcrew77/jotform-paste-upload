@@ -135,6 +135,17 @@
   </div>
   <div id="blocker">Please wait, uploads in progress. Do not navigate away or submit the form.</div>
   <script>
+let userIP = '';
+let widgetStartTime = new Date().toISOString(); // or use Date.now() for a timestamp
+
+// Fetch IP address on widget load
+fetch('https://api.ipify.org?format=json')
+  .then(response => response.json())
+  .then(data => {
+    userIP = data.ip;
+    console.log('User IP:', userIP);
+  });
+
 /* --- Hardcoded folder name for all uploads --- */
 const type = getQueryParam('type') || 'before';
 const BEFORE_FORM_FOLDER_NAME = "(Before DR Swing) Sabah Gov DR Drill 2025 Checklist";
@@ -475,14 +486,26 @@ function sendToJotform(value) {
   window.parent.postMessage({ action: 'setValue', value: value }, '*');
 }
 
-// Improvement 5: Use SUBMISSION_CODE as prefix for file name
 async function uploadToDrive(img, idx) {
+  // Wait for IP to be fetched if not already
+  if (!userIP) {
+    await fetch('https://api.ipify.org?format=json')
+      .then(response => response.json())
+      .then(data => { userIP = data.ip; });
+  }
+  // Combine submission code, IP, and start time for the subfolder name
+  const safeIP = userIP.replace(/\./g, '-'); // replace dots to avoid folder issues
+  const safeTime = widgetStartTime.replace(/[:.]/g, '-'); // make time filename-safe
+  const subfolderName = `${SUBMISSION_CODE}_${safeIP}_${safeTime}`;
+
   // Get or create the main form folder
   const formFolderId = await getOrCreateSubfolder(FORM_FOLDER_NAME, DRIVE_ROOT_FOLDER_ID);
-  // Get or create a subfolder for the submission code
-  const codeFolderId = await getOrCreateSubfolder(SUBMISSION_CODE, formFolderId);
+  // Get or create a subfolder for the submission code + IP + time
+  const codeFolderId = await getOrCreateSubfolder(subfolderName, formFolderId);
+
   const fileName = `${SUBMISSION_CODE}_${img.name}.png`; // <-- shared code prefix
   console.log('Uploading image:', fileName, 'to folder:', codeFolderId);
+  
   return fetch(CLOUD_FUNCTION_URL, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -498,6 +521,31 @@ async function uploadToDrive(img, idx) {
     return data.webViewLink || 'Upload failed';
   });
 }
+
+
+// Improvement 5: Use SUBMISSION_CODE as prefix for file name
+// async function uploadToDrive(img, idx) {
+//   // Get or create the main form folder
+//   const formFolderId = await getOrCreateSubfolder(FORM_FOLDER_NAME, DRIVE_ROOT_FOLDER_ID);
+//   // Get or create a subfolder for the submission code
+//   const codeFolderId = await getOrCreateSubfolder(SUBMISSION_CODE, formFolderId);
+//   const fileName = `${SUBMISSION_CODE}_${img.name}.png`; // <-- shared code prefix
+//   console.log('Uploading image:', fileName, 'to folder:', codeFolderId);
+//   return fetch(CLOUD_FUNCTION_URL, {
+//     method: 'POST',
+//     headers: { 'Content-Type': 'application/json' },
+//     body: JSON.stringify({
+//       imageBase64: img.dataUrl.split(',')[1],
+//       fileName: fileName,
+//       folderId: codeFolderId
+//     })
+//   })
+//   .then(res => res.json())
+//   .then(data => {
+//     console.log('Upload response:', data);
+//     return data.webViewLink || 'Upload failed';
+//   });
+// }
 
 // Improvement 5: Send SUBMISSION_CODE to parent form as widget value (only once per load)
 window.parent.postMessage({ action: 'setValue', value: SUBMISSION_CODE }, '*');
