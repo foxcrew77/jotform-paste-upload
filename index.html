@@ -493,19 +493,33 @@ async function uploadToDrive(img, idx) {
       .then(response => response.json())
       .then(data => { userIP = data.ip; });
   }
-  // Combine submission code, IP, and start time for the subfolder name
-  const safeIP = userIP.replace(/\./g, '-'); // replace dots to avoid folder issues
-  const safeTime = widgetStartTime.replace(/[:.]/g, '-'); // make time filename-safe
-  const subfolderName = `${SUBMISSION_CODE}_${safeIP}_${safeTime}`;
+
+  // --- NEW CODE START ---
+  function getMalaysiaTimeString(isoString) {
+    const date = new Date(isoString);
+    const malaysiaOffset = 8 * 60;
+    const utc = date.getTime() + (date.getTimezoneOffset() * 60000);
+    const malaysiaDate = new Date(utc + (malaysiaOffset * 60000));
+    const yyyy = malaysiaDate.getFullYear();
+    const mm = String(malaysiaDate.getMonth() + 1).padStart(2, '0');
+    const dd = String(malaysiaDate.getDate()).padStart(2, '0');
+    const hh = String(malaysiaDate.getHours()).padStart(2, '0');
+    const min = String(malaysiaDate.getMinutes()).padStart(2, '0');
+    return `${yyyy}${mm}${dd}_${hh}${min}`;
+  }
+  const formattedIP = userIP; // keep dots
+  const malaysiaTimeStr = getMalaysiaTimeString(widgetStartTime);
+  const subfolderName = `${SUBMISSION_CODE}_${formattedIP}_${malaysiaTimeStr}`;
+  // --- NEW CODE END ---
 
   // Get or create the main form folder
   const formFolderId = await getOrCreateSubfolder(FORM_FOLDER_NAME, DRIVE_ROOT_FOLDER_ID);
   // Get or create a subfolder for the submission code + IP + time
   const codeFolderId = await getOrCreateSubfolder(subfolderName, formFolderId);
 
-  const fileName = `${SUBMISSION_CODE}_${img.name}.png`; // <-- shared code prefix
+  const fileName = `${SUBMISSION_CODE}_${img.name}.png`;
   console.log('Uploading image:', fileName, 'to folder:', codeFolderId);
-  
+
   return fetch(CLOUD_FUNCTION_URL, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
