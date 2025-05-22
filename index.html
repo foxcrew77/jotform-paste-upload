@@ -143,6 +143,18 @@ const FORM_FOLDER_NAME = type === 'dr' ? DR_FORM_FOLDER_NAME : BEFORE_FORM_FOLDE
 //const PAGE_ID = getQueryParam('pageId') || 'defaultPage';
 
 // Improvement 5: Shared submission code for all widgets on the same submission
+//1st option
+let SUBMISSION_CODE = sessionStorage.getItem('jotform_submission_code');
+  if (!SUBMISSION_CODE) {
+    const ts = Date.now().toString().slice(-6);
+    const rand = Math.random().toString(36).substring(2, 5).toUpperCase();
+    const prefixLetter = type === 'dr' ? 'DR' : 'B'; 
+    SUBMISSION_CODE = prefixLetter + ts + rand;
+    sessionStorage.setItem('jotform_submission_code', SUBMISSION_CODE);
+  }
+  console.log('SUBMISSION_CODE:', SUBMISSION_CODE);
+
+//2nd option
 // const CODE_KEY = 'jotform_submission_code';
 // let SUBMISSION_CODE = localStorage.getItem(CODE_KEY);
 // if (!SUBMISSION_CODE) {
@@ -155,13 +167,15 @@ const FORM_FOLDER_NAME = type === 'dr' ? DR_FORM_FOLDER_NAME : BEFORE_FORM_FOLDE
 //   SUBMISSION_CODE = prefixLetter + ts + rand;
 //   localStorage.setItem(CODE_KEY, SUBMISSION_CODE);
 // }
+
+//3rd option
 // Always generate a new submission code on every load
-const ts = Date.now().toString().slice(-6);
-const rand = Math.random().toString(36).substring(2, 5).toUpperCase();
-const prefixLetter = type === 'dr' ? 'DR' : 'B'; 
-const SUBMISSION_CODE = prefixLetter + ts + rand;
-console.log('SUBMISSION_CODE:', SUBMISSION_CODE);
-const submissionPrefix = 'submission_' + Date.now();
+// const ts = Date.now().toString().slice(-6);
+// const rand = Math.random().toString(36).substring(2, 5).toUpperCase();
+// const prefixLetter = type === 'dr' ? 'DR' : 'B'; 
+// const SUBMISSION_CODE = prefixLetter + ts + rand;
+// console.log('SUBMISSION_CODE:', SUBMISSION_CODE);
+// const submissionPrefix = 'submission_' + Date.now();
 
 // Rename image prefix automatically with testID
 function getQueryParam(name) {
