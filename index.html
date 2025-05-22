@@ -183,6 +183,9 @@ function addImage(file) {
     };
     images.push(imgObj);
     renderImages();
+    setTimeout(() => {
+      window.scrollTo(0, document.body.scrollHeight);
+    }, 100);
     saveImagesToStorage();
     setTimeout(() => {
       const inputs = document.querySelectorAll('.img-name');
@@ -258,6 +261,13 @@ function clearImagesFromStorage() {
 // }
 
 function renderImages() {
+  const stickyBar = document.getElementById('stickyUploadBar');
+  if (images.length === 0) {
+    stickyBar.style.display = 'none';
+  } else {
+    stickyBar.style.display = '';
+  }
+
   const instructionsDiv = document.getElementById('instructions');
   if (images.length === 0) {
     instructionsDiv.innerHTML = `
@@ -318,7 +328,8 @@ function renderImages() {
   });
 
   const batchUploadBtn = document.getElementById('batchUploadBtn');
-  if (images.length > 0) {
+  const hasPending = images.some(img => img.status !== 'success');
+  if (images.length > 0 && hasPending){
     batchUploadBtn.style.display = '';
   } else {
     batchUploadBtn.style.display = 'none';
